@@ -1,5 +1,5 @@
 # Azure DevOps Pipelines Tasks
-This project hosts custom extensions for Azure DevOps pipeline, and it includes the extensions below. Each task has a small README inside and complete documentation for each one is available under the /docs directory.
+This project hosts custom extensions for Azure DevOps pipelines, and it includes the extensions below. Each task has a small README inside and complete documentation for each one is available under the /docs directory.
 
 This project has its own [license](LICENSE) which grants free rights to use and distribute the software for non-commercial use.
 
