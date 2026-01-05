@@ -2,14 +2,12 @@ import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
 
-// Mock Azure Pipelines task lib and @actions packages
+// Mock Azure Pipelines task lib and tool lib
 jest.mock('azure-pipelines-task-lib/task');
-jest.mock('@actions/tool-cache');
-jest.mock('@actions/core');
+jest.mock('azure-pipelines-tool-lib/tool');
 
 import * as tl from 'azure-pipelines-task-lib/task';
-import * as tc from '@actions/tool-cache';
-import * as core from '@actions/core';
+import * as tr from 'azure-pipelines-tool-lib/tool';
 
 // Import functions from index.ts that we need to test
 // Note: Since index.ts runs immediately on import, we need to mock first
@@ -29,16 +27,16 @@ const mockSetResult = jest.fn();
 const mockDownloadTool = jest.fn();
 const mockExtractZip = jest.fn();
 const mockExtract7z = jest.fn();
-const mockFind = jest.fn();
+const mockFindLocalTool = jest.fn();
 const mockCacheDir = jest.fn();
-const mockAddPath = jest.fn();
+const mockPrependPath = jest.fn();
 
-(tc.downloadTool as jest.Mock) = mockDownloadTool;
-(tc.extractZip as jest.Mock) = mockExtractZip;
-(tc.extract7z as jest.Mock) = mockExtract7z;
-(tc.find as jest.Mock) = mockFind;
-(tc.cacheDir as jest.Mock) = mockCacheDir;
-(core.addPath as jest.Mock) = mockAddPath;
+(tr.downloadTool as jest.Mock) = mockDownloadTool;
+(tr.extractZip as jest.Mock) = mockExtractZip;
+(tr.extract7z as jest.Mock) = mockExtract7z;
+(tr.findLocalTool as jest.Mock) = mockFindLocalTool;
+(tr.cacheDir as jest.Mock) = mockCacheDir;
+(tr.prependPath as jest.Mock) = mockPrependPath;
 
 describe('SqlPackage Installer Tests', () => {
   beforeEach(() => {
@@ -170,7 +168,7 @@ describe('SqlPackage Installer Tests', () => {
       const mockPath = '/tmp/sqlpackage.zip';
       mockDownloadTool.mockResolvedValue(mockPath);
 
-      const result = await tc.downloadTool('https://example.com/sqlpackage.zip');
+      const result = await tr.downloadTool('https://example.com/sqlpackage.zip');
       expect(result).toBe(mockPath);
       expect(mockDownloadTool).toHaveBeenCalled();
     });
@@ -179,7 +177,7 @@ describe('SqlPackage Installer Tests', () => {
       const mockExtractPath = '/tmp/extracted';
       mockExtractZip.mockResolvedValue(mockExtractPath);
 
-      const result = await tc.extractZip('/tmp/sqlpackage.zip');
+      const result = await tr.extractZip('/tmp/sqlpackage.zip');
       expect(result).toBe(mockExtractPath);
       expect(mockExtractZip).toHaveBeenCalled();
     });
@@ -188,7 +186,7 @@ describe('SqlPackage Installer Tests', () => {
       const mockCachePath = '/agent/_work/_tool/SqlPackage/170.2.70/x64';
       mockCacheDir.mockResolvedValue(mockCachePath);
 
-      const result = await tc.cacheDir('/tmp/extracted', 'SqlPackage', '170.2.70', 'x64');
+      const result = await tr.cacheDir('/tmp/extracted', 'SqlPackage', '170.2.70', 'x64');
       expect(result).toBe(mockCachePath);
       expect(mockCacheDir).toHaveBeenCalledWith('/tmp/extracted', 'SqlPackage', '170.2.70', 'x64');
     });
@@ -215,14 +213,14 @@ describe('SqlPackage Installer Tests', () => {
       const error = new Error('Network error');
       mockDownloadTool.mockRejectedValue(error);
 
-      await expect(tc.downloadTool('https://invalid.url')).rejects.toThrow('Network error');
+      await expect(tr.downloadTool('https://invalid.url')).rejects.toThrow('Network error');
     });
 
     it('should handle extraction errors gracefully', async () => {
       const error = new Error('Extraction failed');
       mockExtractZip.mockRejectedValue(error);
 
-      await expect(tc.extractZip('/invalid/path.zip')).rejects.toThrow('Extraction failed');
+      await expect(tr.extractZip('/invalid/path.zip')).rejects.toThrow('Extraction failed');
     });
   });
 
@@ -342,17 +340,17 @@ describe('SqlPackage Installer Tests', () => {
     });
 
     it('should check for tool in cache before downloading', () => {
-      mockFind.mockReturnValue('/cached/path/to/sqlpackage');
+      mockFindLocalTool.mockReturnValue('/cached/path/to/sqlpackage');
 
-      const cachedPath = tc.find('SqlPackage', '170.2.70', 'x64');
+      const cachedPath = tr.findLocalTool('SqlPackage', '170.2.70', 'x64');
       expect(cachedPath).toBe('/cached/path/to/sqlpackage');
-      expect(mockFind).toHaveBeenCalledWith('SqlPackage', '170.2.70', 'x64');
+      expect(mockFindLocalTool).toHaveBeenCalledWith('SqlPackage', '170.2.70', 'x64');
     });
 
     it('should return empty when tool not in cache', () => {
-      mockFind.mockReturnValue('');
+      mockFindLocalTool.mockReturnValue('');
 
-      const cachedPath = tc.find('SqlPackage', '999.0.0', 'x64');
+      const cachedPath = tr.findLocalTool('SqlPackage', '999.0.0', 'x64');
       expect(cachedPath).toBe('');
     });
   });
@@ -367,13 +365,13 @@ describe('SqlPackage Installer Tests', () => {
       mockExtractZip.mockResolvedValue(extractPath);
       mockCacheDir.mockResolvedValue(cachePath);
 
-      const downloaded = await tc.downloadTool('https://example.com/sqlpackage.zip');
+      const downloaded = await tr.downloadTool('https://example.com/sqlpackage.zip');
       expect(downloaded).toBe(downloadPath);
 
-      const extracted = await tc.extractZip(downloaded);
+      const extracted = await tr.extractZip(downloaded);
       expect(extracted).toBe(extractPath);
 
-      const cached = await tc.cacheDir(extracted, 'SqlPackage', '170.2.70', 'x64');
+      const cached = await tr.cacheDir(extracted, 'SqlPackage', '170.2.70', 'x64');
       expect(cached).toBe(cachePath);
 
       expect(mockDownloadTool).toHaveBeenCalledTimes(1);
@@ -383,9 +381,9 @@ describe('SqlPackage Installer Tests', () => {
 
     it('should add tool to PATH after acquisition', () => {
       const toolPath = '/path/to/sqlpackage';
-      core.addPath(toolPath);
+      tr.prependPath(toolPath);
 
-      expect(mockAddPath).toHaveBeenCalledWith(toolPath);
+      expect(mockPrependPath).toHaveBeenCalledWith(toolPath);
     });
   });
 });

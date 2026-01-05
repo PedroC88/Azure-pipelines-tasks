@@ -1,6 +1,5 @@
 import * as tl from 'azure-pipelines-task-lib/task';
-import * as tc from '@actions/tool-cache';
-import * as core from '@actions/core';
+import * as tr from 'azure-pipelines-tool-lib/tool';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
@@ -25,7 +24,7 @@ async function getAvailableVersions(): Promise<SqlPackageVersion[]> {
 
     try {
         if (isDebug) console.log('Attempting to fetch versions from GitHub API...');
-        const response = await tc.downloadTool('https://api.github.com/repos/microsoft/DacFx/releases');
+        const response = await tr.downloadTool('https://api.github.com/repos/microsoft/DacFx/releases');
         const content = fs.readFileSync(response, 'utf8');
         const releases = JSON.parse(content);
 
@@ -131,7 +130,7 @@ async function acquireSqlPackage(versionSpec: string, checkLatest: boolean): Pro
     const isDebug = tl.getVariable('System.Debug') === 'true';
 
     // Check if we already have this version in cache
-    let toolPath = tc.find(toolName, versionSpec, arch);
+    let toolPath = tr.findLocalTool(toolName, versionSpec, arch);
 
     if (!toolPath || checkLatest) {
         // Resolve version
@@ -168,7 +167,7 @@ async function acquireSqlPackage(versionSpec: string, checkLatest: boolean): Pro
 
         // Download
         console.log(`Downloading from: ${downloadUrl}`);
-        const downloadPath = await tc.downloadTool(downloadUrl);
+        const downloadPath = await tr.downloadTool(downloadUrl);
         if (isDebug) console.log(`Downloaded to: ${downloadPath}`);
         console.log('Extracting downloaded package...');
 
@@ -177,14 +176,14 @@ async function acquireSqlPackage(versionSpec: string, checkLatest: boolean): Pro
         try {
             // SqlPackage downloads are always ZIP files, even if the URL doesn't show .zip extension
             if (isDebug) console.log('Extracting as ZIP file...');
-            extractedPath = await tc.extractZip(downloadPath);
+            extractedPath = await tr.extractZip(downloadPath);
             if (isDebug) console.log(`Successfully extracted to: ${extractedPath}`);
         } catch (extractError) {
             if (isDebug) console.log(`ZIP extraction failed: ${extractError}`);
             // Only try 7z as fallback if ZIP fails
             try {
                 if (isDebug) console.log('Retrying with 7z extraction...');
-                extractedPath = await tc.extract7z(downloadPath);
+                extractedPath = await tr.extract7z(downloadPath);
                 if (isDebug) console.log(`Successfully extracted with 7z to: ${extractedPath}`);
             } catch (retryError) {
                 throw new Error(`Failed to extract downloaded package. ZIP extraction failed: ${extractError}. 7z extraction also failed: ${retryError}`);
@@ -211,7 +210,7 @@ async function acquireSqlPackage(versionSpec: string, checkLatest: boolean): Pro
         }
         console.log(`Caching SqlPackage version ${semverVersion}...`);
         const sqlPackageDir = path.dirname(sqlPackagePath);
-        toolPath = await tc.cacheDir(sqlPackageDir, toolName, semverVersion, arch);
+        toolPath = await tr.cacheDir(sqlPackageDir, toolName, semverVersion, arch);
 
         console.log(`SqlPackage version ${semverVersion} has been installed successfully.`);
     } else {
@@ -370,7 +369,7 @@ async function run() {
 
         // Add to PATH
         if (isDebug) console.log(`Adding ${toolPath} to PATH`);
-        core.addPath(toolPath);
+        tr.prependPath(toolPath);
 
         // Set output variables
         tl.setVariable('SqlPackageRoot', toolPath);

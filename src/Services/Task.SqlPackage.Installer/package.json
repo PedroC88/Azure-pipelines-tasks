@@ -31,9 +31,8 @@
   "author": "PedroC88",
   "license": "SEE LICENSE IN LICENSE",
   "dependencies": {
-    "@actions/core": "^1.11.1",
-    "@actions/tool-cache": "^2.0.1",
-    "azure-pipelines-task-lib": "^5.2.4"
+    "azure-pipelines-task-lib": "^5.2.4",
+    "azure-pipelines-tool-lib": "^2.0.10"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
