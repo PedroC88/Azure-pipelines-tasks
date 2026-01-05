@@ -30,6 +30,9 @@ custom-sqlpackage/
 # Extension package
 *.vsix
 
+# Development artifacts
+.taskkey
+
 # OS generated files
 .DS_Store
 .DS_Store?
