@@ -7,7 +7,7 @@ npm install
 npm run package
 ```
 
-Alternatively you can use the clean-build.ps1 script.
+Alternatively you can use the clean-rebuild.ps1 script.
 
 This produces `PedroC88.sqlpackage-installer-{version}.vsix`
 
