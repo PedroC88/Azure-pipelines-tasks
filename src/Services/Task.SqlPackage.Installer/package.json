@@ -32,9 +32,7 @@
   "license": "MIT",
   "dependencies": {
     "azure-pipelines-task-lib": "^5.2.4",
-    "azure-pipelines-tool-lib": "^2.0.10",
-    "glob": "^13.0.0",
-    "graceful-fs": "^4.2.11"
+    "azure-pipelines-tool-lib": "^2.0.10"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
