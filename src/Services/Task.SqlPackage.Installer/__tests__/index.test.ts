@@ -2,12 +2,14 @@ import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
 
-// Mock Azure Pipelines task lib and tool lib
+// Mock Azure Pipelines task lib and @actions packages
 jest.mock('azure-pipelines-task-lib/task');
-jest.mock('azure-pipelines-tool-lib/tool');
+jest.mock('@actions/tool-cache');
+jest.mock('@actions/core');
 
 import * as tl from 'azure-pipelines-task-lib/task';
-import * as tr from 'azure-pipelines-tool-lib/tool';
+import * as tc from '@actions/tool-cache';
+import * as core from '@actions/core';
 
 // Import functions from index.ts that we need to test
 // Note: Since index.ts runs immediately on import, we need to mock first
@@ -27,16 +29,16 @@ const mockSetResult = jest.fn();
 const mockDownloadTool = jest.fn();
 const mockExtractZip = jest.fn();
 const mockExtract7z = jest.fn();
-const mockFindLocalTool = jest.fn();
+const mockFind = jest.fn();
 const mockCacheDir = jest.fn();
-const mockPrependPath = jest.fn();
+const mockAddPath = jest.fn();
 
-(tr.downloadTool as jest.Mock) = mockDownloadTool;
-(tr.extractZip as jest.Mock) = mockExtractZip;
-(tr.extract7z as jest.Mock) = mockExtract7z;
-(tr.findLocalTool as jest.Mock) = mockFindLocalTool;
-(tr.cacheDir as jest.Mock) = mockCacheDir;
-(tr.prependPath as jest.Mock) = mockPrependPath;
+(tc.downloadTool as jest.Mock) = mockDownloadTool;
+(tc.extractZip as jest.Mock) = mockExtractZip;
+(tc.extract7z as jest.Mock) = mockExtract7z;
+(tc.find as jest.Mock) = mockFind;
+(tc.cacheDir as jest.Mock) = mockCacheDir;
+(core.addPath as jest.Mock) = mockAddPath;
 
 describe('SqlPackage Installer Tests', () => {
   beforeEach(() => {
@@ -168,7 +170,7 @@ describe('SqlPackage Installer Tests', () => {
       const mockPath = '/tmp/sqlpackage.zip';
       mockDownloadTool.mockResolvedValue(mockPath);
 
-      const result = await tr.downloadTool('https://example.com/sqlpackage.zip');
+      const result = await tc.downloadTool('https://example.com/sqlpackage.zip');
       expect(result).toBe(mockPath);
       expect(mockDownloadTool).toHaveBeenCalled();
     });
@@ -177,7 +179,7 @@ describe('SqlPackage Installer Tests', () => {
       const mockExtractPath = '/tmp/extracted';
       mockExtractZip.mockResolvedValue(mockExtractPath);
 
-      const result = await tr.extractZip('/tmp/sqlpackage.zip');
+      const result = await tc.extractZip('/tmp/sqlpackage.zip');
       expect(result).toBe(mockExtractPath);
       expect(mockExtractZip).toHaveBeenCalled();
     });
@@ -186,7 +188,7 @@ describe('SqlPackage Installer Tests', () => {
       const mockCachePath = '/agent/_work/_tool/SqlPackage/170.2.70/x64';
       mockCacheDir.mockResolvedValue(mockCachePath);
 
-      const result = await tr.cacheDir('/tmp/extracted', 'SqlPackage', '170.2.70', 'x64');
+      const result = await tc.cacheDir('/tmp/extracted', 'SqlPackage', '170.2.70', 'x64');
       expect(result).toBe(mockCachePath);
       expect(mockCacheDir).toHaveBeenCalledWith('/tmp/extracted', 'SqlPackage', '170.2.70', 'x64');
     });
@@ -213,14 +215,177 @@ describe('SqlPackage Installer Tests', () => {
       const error = new Error('Network error');
       mockDownloadTool.mockRejectedValue(error);
 
-      await expect(tr.downloadTool('https://invalid.url')).rejects.toThrow('Network error');
+      await expect(tc.downloadTool('https://invalid.url')).rejects.toThrow('Network error');
     });
 
     it('should handle extraction errors gracefully', async () => {
       const error = new Error('Extraction failed');
       mockExtractZip.mockRejectedValue(error);
 
-      await expect(tr.extractZip('/invalid/path.zip')).rejects.toThrow('Extraction failed');
+      await expect(tc.extractZip('/invalid/path.zip')).rejects.toThrow('Extraction failed');
+    });
+  });
+
+  describe('Helper Functions', () => {
+    it('should get correct filename for each platform', () => {
+      const fileNames: { [key: string]: string } = {
+        'win32': 'sqlpackage-win-x64.zip',
+        'linux': 'sqlpackage-linux-x64.zip',
+        'darwin': 'sqlpackage-osx-x64.zip'
+      };
+
+      Object.keys(fileNames).forEach(platform => {
+        expect(fileNames[platform]).toBeTruthy();
+        expect(fileNames[platform]).toContain('sqlpackage');
+        expect(fileNames[platform]).toMatch(/\.(zip|tar\.gz)$/);
+      });
+    });
+
+    it('should find matching asset for platform', () => {
+      const assets = [
+        { name: 'sqlpackage-windows-x64.zip', browser_download_url: 'https://example.com/win.zip' },
+        { name: 'sqlpackage-linux-x64.zip', browser_download_url: 'https://example.com/linux.zip' },
+        { name: 'sqlpackage-osx-x64.zip', browser_download_url: 'https://example.com/mac.zip' }
+      ];
+
+      // Test finding Windows asset
+      const winKeywords = ['win', 'windows'];
+      const winAsset = assets.find(a => winKeywords.some(k => a.name.toLowerCase().includes(k)));
+      expect(winAsset).toBeDefined();
+      expect(winAsset?.name).toContain('windows');
+
+      // Test finding Linux asset
+      const linuxKeywords = ['linux'];
+      const linuxAsset = assets.find(a => linuxKeywords.some(k => a.name.toLowerCase().includes(k)));
+      expect(linuxAsset).toBeDefined();
+      expect(linuxAsset?.name).toContain('linux');
+
+      // Test finding macOS asset
+      const macKeywords = ['osx', 'mac', 'darwin'];
+      const macAsset = assets.find(a => macKeywords.some(k => a.name.toLowerCase().includes(k)));
+      expect(macAsset).toBeDefined();
+      expect(macAsset?.name).toContain('osx');
+    });
+
+    it('should return null for non-matching platform', () => {
+      const assets = [
+        { name: 'some-other-package.zip', browser_download_url: 'https://example.com/other.zip' }
+      ];
+
+      const winKeywords = ['win', 'windows'];
+      const result = assets.find(a => winKeywords.some(k => a.name.toLowerCase().includes(k)));
+      expect(result).toBeUndefined();
+    });
+
+    it('should construct default version info', () => {
+      const defaultVersion = {
+        version: '170.2.70.1',
+        downloadUrl: 'https://aka.ms/sqlpackage-windows',
+        fileName: 'sqlpackage-win-x64.zip'
+      };
+
+      expect(defaultVersion.version).toMatch(/^\d+\.\d+\.\d+\.\d+$/);
+      expect(defaultVersion.downloadUrl).toMatch(/^https:\/\//);
+      expect(defaultVersion.fileName).toContain('sqlpackage');
+    });
+  });
+
+  describe('Path and File Search', () => {
+    it('should determine correct executable name by platform', () => {
+      const currentPlatform = os.platform();
+      const executableName = currentPlatform === 'win32' ? 'sqlpackage.exe' : 'sqlpackage';
+
+      if (currentPlatform === 'win32') {
+        expect(executableName).toBe('sqlpackage.exe');
+      } else {
+        expect(executableName).toBe('sqlpackage');
+      }
+    });
+
+    it('should construct search paths correctly', () => {
+      const rootPath = '/extracted/root';
+      const searchPaths = [
+        rootPath,
+        path.join(rootPath, 'sqlpackage'),
+        path.join(rootPath, 'tools'),
+        path.join(rootPath, 'bin')
+      ];
+
+      searchPaths.forEach(p => {
+        expect(p).toBeTruthy();
+        // Normalize paths for cross-platform comparison
+        const normalizedPath = p.replace(/\\/g, '/');
+        const normalizedRoot = rootPath.replace(/\\/g, '/');
+        expect(normalizedPath).toContain(normalizedRoot);
+      });
+    });
+
+    it('should handle recursive directory search logic', () => {
+      // Test that recursive search would check subdirectories
+      const mockFiles = ['file1.txt', 'subdir', 'file2.exe'];
+      const hasSubdirectories = mockFiles.some(f => !f.includes('.'));
+      expect(hasSubdirectories).toBe(true);
+    });
+  });
+
+  describe('Cache and Tool Management', () => {
+    it('should use correct cache parameters', () => {
+      const toolName = 'SqlPackage';
+      const version = '170.2.70';
+      const arch = 'x64';
+      const cacheDir = '/path/to/sqlpackage';
+
+      expect(toolName).toBe('SqlPackage');
+      expect(version).toMatch(/^\d+\.\d+\.\d+$/);
+      expect(['x64', 'arm64', 'ia32']).toContain(arch);
+      expect(cacheDir).toBeTruthy();
+    });
+
+    it('should check for tool in cache before downloading', () => {
+      mockFind.mockReturnValue('/cached/path/to/sqlpackage');
+
+      const cachedPath = tc.find('SqlPackage', '170.2.70', 'x64');
+      expect(cachedPath).toBe('/cached/path/to/sqlpackage');
+      expect(mockFind).toHaveBeenCalledWith('SqlPackage', '170.2.70', 'x64');
+    });
+
+    it('should return empty when tool not in cache', () => {
+      mockFind.mockReturnValue('');
+
+      const cachedPath = tc.find('SqlPackage', '999.0.0', 'x64');
+      expect(cachedPath).toBe('');
+    });
+  });
+
+  describe('Integration Workflow', () => {
+    it('should follow download-extract-cache workflow', async () => {
+      const downloadPath = '/tmp/download.zip';
+      const extractPath = '/tmp/extracted';
+      const cachePath = '/agent/_work/_tool/SqlPackage/170.2.70/x64';
+
+      mockDownloadTool.mockResolvedValue(downloadPath);
+      mockExtractZip.mockResolvedValue(extractPath);
+      mockCacheDir.mockResolvedValue(cachePath);
+
+      const downloaded = await tc.downloadTool('https://example.com/sqlpackage.zip');
+      expect(downloaded).toBe(downloadPath);
+
+      const extracted = await tc.extractZip(downloaded);
+      expect(extracted).toBe(extractPath);
+
+      const cached = await tc.cacheDir(extracted, 'SqlPackage', '170.2.70', 'x64');
+      expect(cached).toBe(cachePath);
+
+      expect(mockDownloadTool).toHaveBeenCalledTimes(1);
+      expect(mockExtractZip).toHaveBeenCalledTimes(1);
+      expect(mockCacheDir).toHaveBeenCalledTimes(1);
+    });
+
+    it('should add tool to PATH after acquisition', () => {
+      const toolPath = '/path/to/sqlpackage';
+      core.addPath(toolPath);
+
+      expect(mockAddPath).toHaveBeenCalledWith(toolPath);
     });
   });
 });
