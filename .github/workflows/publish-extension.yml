@@ -84,7 +84,7 @@ jobs:
           if ($latestRelease) {
             $latestVersion = $latestRelease -replace '^v', ''
             $currentVersion = "${{ steps.get_version.outputs.version }}"
-            
+
             echo "Latest published version: $latestVersion"
             echo "Current version: $currentVersion"
             
