@@ -1,6 +1,6 @@
 # Version History
 
-## v1.0.15 (Current)
+## v1.0.17 (Current)
 **Date:** January 2026
 
 ### Changes

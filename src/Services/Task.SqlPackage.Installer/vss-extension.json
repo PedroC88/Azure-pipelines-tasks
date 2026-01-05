@@ -2,7 +2,7 @@
   "manifestVersion": 1,
   "id": "sqlpackage-installer",
   "name": "SqlPackage Installer",
-  "version": "1.0.16",
+  "version": "1.0.19",
   "publisher": "PedroC88",
   "targets": [
     {
@@ -34,12 +34,12 @@
       "uri": "https://github.com/PedroC88/Azure-pipelines-tasks/issues"
     }
   },
-  "icons": {
-    "default": "icon.svg"
-  },
   "branding": {
     "color": "rgb(0, 120, 212)",
     "theme": "light"
+  },
+  "icons": {
+    "default": "icon.png"
   },
   "files": [
     {
@@ -49,7 +49,7 @@
       "path": "README.md"
     },
     {
-      "path": "icon.svg"
+      "path": "icon.png"
     }
   ],
   "contributions": [

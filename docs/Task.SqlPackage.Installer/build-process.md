@@ -74,9 +74,9 @@ Creates a minimal node_modules for the VSIX package:
 ## Version Management
 
 Update version in 3 files:
-1. `package.json` - `"version": "1.0.15"`
+1. `package.json` - `"version": "1.0.17"`
 2. `task.json` - Major/Minor/Patch object
-3. `vss-extension.json` - `"version": "1.0.15"`
+3. `vss-extension.json` - `"version": "1.0.17"`
 
 ## Testing Locally
 

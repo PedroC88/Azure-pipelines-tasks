@@ -1,6 +1,6 @@
 {
   "name": "sqlpackage-installer",
-  "version": "1.0.16",
+  "version": "1.0.19",
   "description": "Installs a specific version of SqlPackage from the internet or the tools cache and adds it to the PATH. Use this task to change the version of SqlPackage used in subsequent tasks.",
   "main": "index.js",
   "scripts": {
@@ -29,7 +29,7 @@
     "sqlpackage"
   ],
   "author": "PedroC88",
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "dependencies": {
     "azure-pipelines-task-lib": "^5.2.4",
     "azure-pipelines-tool-lib": "^2.0.10",
