@@ -55,5 +55,6 @@ Copy-Item "index.js" "SqlPackageInstaller/index.js" -Force
 if (Test-Path "index.js.map") {
     Copy-Item "index.js.map" "SqlPackageInstaller/index.js.map" -Force
 }
+Copy-Item "task.json" "SqlPackageInstaller/task.json" -Force
 
 Write-Host "Minimal node_modules prepared successfully."

@@ -8,11 +8,11 @@ lib/
 *.js.map
 *.d.ts
 *.tsbuildinfo
+!fs.realpath.js
 SqlPackageInstaller/
 node_modules_minimal/
 node_modules_temp/
 node_modules_full/
-fs.realpath.js
 
 # Logs
 npm-debug.log*
