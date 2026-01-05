@@ -51,6 +51,7 @@ jobs:
     - name: Create VSIX package
       working-directory: src/Services/Task.SqlPackage.Installer
       run: tfx extension create --manifest-globs vss-extension.json --output-path .
+      shell: pwsh
 
     - name: Restore modules (cleanup)
       working-directory: src/Services/Task.SqlPackage.Installer
