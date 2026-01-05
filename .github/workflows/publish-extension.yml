@@ -51,14 +51,9 @@ jobs:
       working-directory: src/Services/Task.SqlPackage.Installer
       run: npm run build
 
-    - name: Prepare minimal package
-      working-directory: src/Services/Task.SqlPackage.Installer
-      run: npm run prepare-minimal
-
     - name: Create VSIX package
       working-directory: src/Services/Task.SqlPackage.Installer
-      run: tfx extension create --manifest-globs vss-extension.json --output-path .
-      shell: pwsh
+      run: npm run package
 
     - name: Restore modules (cleanup)
       working-directory: src/Services/Task.SqlPackage.Installer
