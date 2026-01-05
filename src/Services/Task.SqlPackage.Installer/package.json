@@ -29,7 +29,7 @@
     "sqlpackage"
   ],
   "author": "PedroC88",
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "MIT",
   "dependencies": {
     "azure-pipelines-task-lib": "^5.2.4",
     "azure-pipelines-tool-lib": "^2.0.10",
