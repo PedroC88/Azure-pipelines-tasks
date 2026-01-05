@@ -1,3 +1,6 @@
+# package-lock.json in root (should only exist in task directory)
+/package-lock.json
+
 # Logs
 logs
 *.log
