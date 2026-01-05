@@ -16,7 +16,7 @@
     "restore-modules": "powershell -ExecutionPolicy Bypass -File restore-modules.ps1",
     "prepackage": "npm run build && npm run prepare-minimal",
     "postpackage": "npm run restore-modules",
-    "package": "npx tfx extension create --manifest-globs vss-extension.json --output-path .",
+    "package": "npx tfx-cli extension create --manifest-globs vss-extension.json --output-path .",
     "install-tfx": "npm install -g tfx-cli"
   },
   "repository": {
