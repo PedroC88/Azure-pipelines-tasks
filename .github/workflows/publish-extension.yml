@@ -12,6 +12,10 @@ on:
         default: false
         type: boolean
 
+permissions:
+  contents: write
+  packages: read
+
 jobs:
   build-and-publish:
     runs-on: windows-latest
