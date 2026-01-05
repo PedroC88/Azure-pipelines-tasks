@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc",
-    "clean": "rimraf dist lib node_modules_minimal node_modules_temp coverage && powershell -Command \"Remove-Item -Path '*.vsix' -Force -ErrorAction SilentlyContinue\"",
+    "clean": "rimraf dist lib node_modules_minimal node_modules_temp coverage *.vsix",
     "compile": "tsc --build",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
