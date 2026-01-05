@@ -80,14 +80,16 @@ jobs:
       run: |
         try {
           # Get the latest release version from GitHub
-          $latestRelease = gh release view --json tagName --jq .tagName 2>$null
-          if ($latestRelease) {
+          $latestRelease = gh release view --json tagName --jq .tagName 2>&1
+          if ($LASTEXITCODE -eq 0 -and $latestRelease) {
             $latestVersion = $latestRelease -replace '^v', ''
             $currentVersion = "${{ steps.get_version.outputs.version }}"
 
             echo "Latest published version: $latestVersion"
             echo "Current version: $currentVersion"
-            
+
+            # Use string comparison - we only care if versions are exactly equal
+            # If they differ at all (even if not semantically newer), allow publish
             if ($latestVersion -eq $currentVersion) {
               echo "version_changed=false" >> $env:GITHUB_OUTPUT
               echo "Version unchanged - skipping publish"
@@ -101,7 +103,9 @@ jobs:
             echo "No previous releases found - will publish"
           }
         } catch {
-          # If there's an error checking releases, allow publishing
+          # If there's an error checking releases, allow publishing (fail-open)
+          # This ensures the workflow doesn't break if GitHub API is unavailable
+          echo "Error checking releases: $_"
           echo "version_changed=true" >> $env:GITHUB_OUTPUT
           echo "Could not check previous releases - will publish"
         }
