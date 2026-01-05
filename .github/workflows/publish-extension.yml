@@ -39,12 +39,13 @@ jobs:
       working-directory: src/Services/Task.SqlPackage.Installer
       run: npm run test:coverage
 
-    - name: Upload coverage reports
-      uses: codecov/codecov-action@v4
+    - name: Upload coverage to Coveralls
+      uses: coverallsapp/github-action@v2
       with:
-        files: ./src/Services/Task.SqlPackage.Installer/coverage/lcov.info
-        flags: unittests
-        fail_ci_if_error: false
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        path-to-lcov: ./src/Services/Task.SqlPackage.Installer/coverage/lcov.info
+        flag-name: unittests
+        parallel: false
 
     - name: Build extension
       working-directory: src/Services/Task.SqlPackage.Installer
