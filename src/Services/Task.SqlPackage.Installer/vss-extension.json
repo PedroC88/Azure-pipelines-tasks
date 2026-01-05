@@ -23,7 +23,7 @@
   ],
   "content": {
     "details": {
-      "path": "README.md"
+      "path": "overview.md"
     }
   },
   "links": {
@@ -46,7 +46,7 @@
       "path": "SqlPackageInstaller"
     },
     {
-      "path": "README.md"
+      "path": "overview.md"
     },
     {
       "path": "icon.png"
