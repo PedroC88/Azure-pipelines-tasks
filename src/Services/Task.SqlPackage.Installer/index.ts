@@ -5,7 +5,6 @@ import * as os from 'os';
 import * as fs from 'fs';
 
 const toolName = 'SqlPackage';
-const stableVersionUrl = 'https://api.github.com/repos/microsoft/DacFx/releases';
 
 // SqlPackage download URLs - Direct links to zip packages
 const downloadUrls: { [key: string]: string } = {

@@ -1,0 +1,97 @@
+name: Build and Publish Extension
+
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  build-and-publish:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '16'
+        cache: 'npm'
+        cache-dependency-path: src/Services/Task.SqlPackage.Installer/package-lock.json
+
+    - name: Install dependencies
+      working-directory: src/Services/Task.SqlPackage.Installer
+      run: npm ci
+
+    - name: Lint code
+      working-directory: src/Services/Task.SqlPackage.Installer
+      run: npm run lint
+
+    - name: Run tests
+      working-directory: src/Services/Task.SqlPackage.Installer
+      run: npm run test:coverage
+
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v4
+      with:
+        files: ./src/Services/Task.SqlPackage.Installer/coverage/lcov.info
+        flags: unittests
+        fail_ci_if_error: false
+
+      working-directory: src/Services/Task.SqlPackage.Installer
+      run: npm run build
+
+    - name: Prepare minimal package
+      working-directory: src/Services/Task.SqlPackage.Installer
+      run: npm run prepare-minimal
+
+    - name: Create VSIX package
+      working-directory: src/Services/Task.SqlPackage.Installer
+      run: tfx extension create --manifest-globs vss-extension.json --output-path .
+
+    - name: Restore modules (cleanup)
+      working-directory: src/Services/Task.SqlPackage.Installer
+      run: npm run restore-modules
+      if: always()
+
+    - name: Get extension version
+      id: get_version
+      working-directory: src/Services/Task.SqlPackage.Installer
+      shell: pwsh
+      run: |
+        $manifest = Get-Content vss-extension.json | ConvertFrom-Json
+        $version = $manifest.version
+        echo "version=$version" >> $env:GITHUB_OUTPUT
+        echo "Extension version: $version"
+
+    - name: Upload VSIX artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: vsix-package
+        path: src/Services/Task.SqlPackage.Installer/*.vsix
+        retention-days: 30
+
+    - name: Publish to Marketplace
+      working-directory: src/Services/Task.SqlPackage.Installer
+      env:
+        AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+      run: |
+        tfx extension publish --vsix (Get-ChildItem -Filter *.vsix | Select-Object -First 1).Name --token $env:AZURE_DEVOPS_PAT --no-prompt
+      shell: pwsh
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ steps.get_version.outputs.version }}
+        name: Release v${{ steps.get_version.outputs.version }}
+        body: |
+          Automated release from develop branch
+
+          Extension version: ${{ steps.get_version.outputs.version }}
+        files: src/Services/Task.SqlPackage.Installer/*.vsix
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
