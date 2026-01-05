@@ -1,0 +1,74 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Microsoft/azure-pipelines-task-lib/master/tasks.schema.json",
+  "id": "a8b9c1d2-3e4f-5678-9abc-def123456789",
+  "name": "SqlPackageInstaller",
+  "friendlyName": "SqlPackage Installer",
+  "description": "Installs a specific version of SqlPackage from the internet or the tools cache and adds it to the PATH. Use this task to change the version of SqlPackage used in subsequent tasks.",
+  "helpMarkDown": "[More information](https://docs.microsoft.com/en-us/sql/tools/sqlpackage)",
+  "category": "Tool",
+  "author": "PedroC88",
+  "version": {
+    "Major": 1,
+    "Minor": 0,
+    "Patch": 15
+  },
+  "minimumAgentVersion": "2.144.0",
+  "instanceNameFormat": "Use SqlPackage $(versionSpec)",
+  "groups": [
+    {
+      "name": "advanced",
+      "displayName": "Advanced",
+      "isExpanded": false
+    }
+  ],
+  "inputs": [
+    {
+      "name": "versionSpec",
+      "type": "string",
+      "label": "Version Spec",
+      "defaultValue": "latest",
+      "required": true,
+      "helpMarkDown": "Version range or exact version of SqlPackage to use. For information about valid version ranges, see [SQLPackage releases](https://docs.microsoft.com/en-us/sql/tools/sqlpackage/sqlpackage-release-notes). Use 'latest' for the most recent version."
+    },
+    {
+      "name": "checkLatest",
+      "type": "boolean",
+      "label": "Check for Latest Version",
+      "defaultValue": "false",
+      "required": false,
+      "helpMarkDown": "Select this option to check online for the latest available version that satisfies the version spec. This is typically false unless you have a specific scenario to always use the absolute latest version.",
+      "groupName": "advanced"
+    },
+    {
+      "name": "installDirectory",
+      "type": "string",
+      "label": "Install Directory",
+      "defaultValue": "",
+      "required": false,
+      "helpMarkDown": "Specify where SqlPackage will be installed. If not specified, SqlPackage will be installed to a directory under the tools cache.",
+      "groupName": "advanced"
+    }
+  ],
+  "execution": {
+    "Node10": {
+      "target": "index.js"
+    },
+    "Node16": {
+      "target": "index.js"
+    },
+    "Node20_1": {
+      "target": "index.js"
+    }
+  },
+  "messages": {
+    "ToolNotFoundMicrosoftUrl": "Unable to find SqlPackage version '%s' for platform %s and architecture %s. Check that the version is valid and try again. If the issue persists, there may be an issue with the tool download URL. Please report this issue.",
+    "ToolNotFoundInCache": "SqlPackage version '%s' not found in cache.",
+    "ToolFoundInCache": "Found SqlPackage version '%s' in cache at %s.",
+    "DownloadingVersion": "Downloading SqlPackage version '%s'.",
+    "ExtractingPackage": "Extracting downloaded package.",
+    "SuccessfullyInstalled": "SqlPackage version '%s' has been installed successfully.",
+    "PrependingPath": "Prepending SqlPackage directory to PATH.",
+    "VersionNotFound": "Version '%s' not found.",
+    "ExactVersionNotRecommended": "Specifying an exact version is not recommended. Consider using a version range instead."
+  }
+}

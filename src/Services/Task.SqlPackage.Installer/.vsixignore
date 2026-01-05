@@ -1,0 +1,32 @@
+# Exclude development and build files
+lib/**
+*.d.ts
+*.js.map
+*.tsbuildinfo
+*.ts
+tsconfig.json
+test.ps1
+run.ps1
+.gitignore
+example-pipeline.yml
+package-lock.json
+temp/**
+tools/**
+custom-sqlpackage/**
+*.vsix
+node_modules_minimal/**
+node_modules_full/**
+
+# Exclude unnecessary node_modules content
+node_modules/**/test/**
+node_modules/**/tests/**
+node_modules/**/example/**
+node_modules/**/examples/**
+node_modules/**/doc/**
+node_modules/**/docs/**
+node_modules/**/*.md
+node_modules/**/*.txt
+node_modules/**/.bin/**
+node_modules/**/*.map
+node_modules/**/.nyc_output/**
+node_modules/**/coverage/**

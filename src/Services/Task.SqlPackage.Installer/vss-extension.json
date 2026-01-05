@@ -1,0 +1,61 @@
+{
+  "manifestVersion": 1,
+  "id": "sqlpackage-installer",
+  "name": "SqlPackage Installer",
+  "version": "1.0.15",
+  "publisher": "PedroC88",
+  "targets": [
+    {
+      "id": "Microsoft.VisualStudio.Services"
+    }
+  ],
+  "description": "Installs a specific version of SqlPackage from the internet or the tools cache and adds it to the PATH. Use this task to change the version of SqlPackage used in subsequent tasks.",
+  "categories": [
+    "Azure Pipelines"
+  ],
+  "tags": [
+    "Build",
+    "Release",
+    "Deploy",
+    "SqlPackage",
+    "Database",
+    "Tool Installer"
+  ],
+  "content": {
+    "details": {
+      "path": "README.md"
+    }
+  },
+  "links": {
+    "getstarted": {
+      "uri": "https://github.com/pedroc88/azuredevopstasks"
+    },
+    "support": {
+      "uri": "https://github.com/pedroc88/azuredevopstasks/issues"
+    }
+  },
+  "branding": {
+    "color": "rgb(0, 120, 212)",
+    "theme": "light"
+  },
+  "files": [
+    {
+      "path": "SqlPackageInstaller"
+    },
+    {
+      "path": "README.md"
+    }
+  ],
+  "contributions": [
+    {
+      "id": "sqlpackage-installer-task",
+      "type": "ms.vss-distributed-task.task",
+      "targets": [
+        "ms.vss-distributed-task.tasks"
+      ],
+      "properties": {
+        "name": "SqlPackageInstaller"
+      }
+    }
+  ]
+}

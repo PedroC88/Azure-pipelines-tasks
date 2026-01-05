@@ -1,0 +1,41 @@
+{
+  "name": "sqlpackage-installer",
+  "version": "1.0.15",
+  "description": "Installs a specific version of SqlPackage from the internet or the tools cache and adds it to the PATH. Use this task to change the version of SqlPackage used in subsequent tasks.",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rimraf dist lib *.vsix node_modules_minimal node_modules_temp",
+    "compile": "tsc --build",
+    "prepare-minimal": "powershell -ExecutionPolicy Bypass -File prepare-minimal.ps1",
+    "restore-modules": "powershell -ExecutionPolicy Bypass -File restore-modules.ps1",
+    "prepackage": "npm run build && npm run prepare-minimal",
+    "postpackage": "npm run restore-modules",
+    "package": "tfx extension create --manifest-globs vss-extension.json --output-path .",
+    "install-tfx": "npm install -g tfx-cli"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pedroc88/azuredevopstasks.git"
+  },
+  "keywords": [
+    "azure-devops",
+    "extension",
+    "sqlpackage"
+  ],
+  "author": "PedroC88",
+  "license": "MIT",
+  "dependencies": {
+    "azure-pipelines-task-lib": "3.4.0",
+    "azure-pipelines-tool-lib": "1.3.2",
+    "glob": "^8.1.0",
+    "graceful-fs": "^4.2.10"
+  },
+  "devDependencies": {
+    "@types/node": "^16.18.108",
+    "@types/q": "^1.5.8",
+    "rimraf": "^3.0.2",
+    "tfx-cli": "^0.15.0",
+    "typescript": "^4.9.5"
+  }
+}

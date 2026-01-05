@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build outputs
+lib/
+*.js
+*.js.map
+*.d.ts
+*.tsbuildinfo
+SqlPackageInstaller/
+node_modules_minimal/
+node_modules_temp/
+node_modules_full/
+fs.realpath.js
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing artifacts
+tools/
+temp/
+custom-sqlpackage/
+
+# Extension package
+*.vsix
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/settings.json
+.vscode/launch.json
+.idea/
+
+# Local test files
+test-results/
