@@ -1,6 +1,6 @@
 # Dependencies
 node_modules/
-package-lock.json
+coverage/
 
 # Build outputs
 lib/
@@ -8,11 +8,13 @@ lib/
 *.js.map
 *.d.ts
 *.tsbuildinfo
+!fs.realpath.js
+!eslint.config.js
+!jest.config.js
 SqlPackageInstaller/
 node_modules_minimal/
 node_modules_temp/
 node_modules_full/
-fs.realpath.js
 
 # Logs
 npm-debug.log*
@@ -26,6 +28,9 @@ custom-sqlpackage/
 
 # Extension package
 *.vsix
+
+# Development artifacts
+.taskkey
 
 # OS generated files
 .DS_Store

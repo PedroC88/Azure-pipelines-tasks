@@ -14,7 +14,8 @@
     "moduleResolution": "node"
   },
   "include": [
-    "*.ts"
+    "*.ts",
+    "__tests__/**/*.ts"
   ],
   "exclude": [
     "node_modules",

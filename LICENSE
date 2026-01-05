@@ -1,0 +1,58 @@
+# Proprietary License with Non-Commercial Use
+
+Copyright (c) 2026 [PedroC88](https://github.com/PedroC88)
+
+## Grant of License
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to use, copy, modify, and distribute the Software for **non-commercial purposes only**, subject to the following conditions:
+
+## Terms and Conditions
+
+### 1. Non-Commercial Use Only
+The Software may be used, copied, modified, and distributed for personal, educational, or non-commercial purposes only. Any commercial use requires a separate commercial license from the original author ([PedroC88](https://github.com/PedroC88)).
+
+### 2. Commercial Use Definition
+"Commercial use" means any use of the Software that is primarily intended for or directed toward commercial advantage or monetary compensation, including but not limited to:
+- Use of the Software in pipelines, workflows, or processes that support commercial, business, or production operations
+- Use of the Software to build, deploy, or maintain commercial products or paid services
+- Use of the Software to provide paid services to third parties
+
+
+For clarity:
+- Use of the Software within any Azure DevOps organization or account (or similar platform) that is owned, controlled, or paid for by a company, government entity, or other commercial/organizational user, in connection with that entity's projects, products, services, or internal operations, **IS** considered commercial use and requires a commercial license, even if the individual user is not personally paid for that use.
+- Use of the Software in an individual's personal Azure DevOps organization or account (or similar platform) for deliverables that are intended exclusively, or partially, for self-use or the use of third parties, where the deliverable or other derivates result in commercial use **IS ALSO** considered commercial use.
+- Use of the Software in an individual's personal Azure DevOps organization or account (or similar platform) for purely personal, educational, hobby, or non-profit projects **is NOT** considered commercial use and is permitted under this license, even if Azure DevOps itself is a commercial platform.
+- As a rule of thumb, if a project directly or indirectly supports revenue-generating, fee-based, or production business activities, use of the Software for that project is considered commercial use.
+
+### 3. Attribution Requirement
+All copies or substantial portions of the Software must include:
+- This license notice
+- Copyright notice identifying [PedroC88](https://github.com/PedroC88) as the original author
+- A link to the original source repository: https://github.com/PedroC88/Azure-pipelines-tasks
+
+### 4. Open Source Requirement
+Any distribution or modification of the Software must remain open source. You may not distribute the Software or derivative works under a closed-source or proprietary license (other than this license), unless explicitly authorized in writing by the original author ([PedroC88](https://github.com/PedroC88)).
+
+### 5. No Transfer of Ownership
+This license grants only the right to use the Software. It does not transfer any ownership rights, intellectual property rights, or copyright to the licensee.
+
+### 6. Commercial Licensing of Derivatives
+If you create a derivative work based on the Software:
+- You may distribute it for non-commercial purposes under this same license
+- Any commercial use or licensing of your derivative work MUST be authorized through a separate commercial license from the original author ([PedroC88](https://github.com/PedroC88))
+- You may not grant commercial licenses to third parties without authorization from [PedroC88](https://github.com/PedroC88)
+
+### 7. No Warranty
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+## Commercial License
+
+For commercial use of this Software, please contact [PedroC88](https://github.com/PedroC88) to obtain a commercial license.
+
+## Termination
+
+Any violation of the terms of this license automatically terminates your rights under this license.
+
+---
+
+For questions regarding licensing, please open an issue at: https://github.com/PedroC88/Azure-pipelines-tasks/issues

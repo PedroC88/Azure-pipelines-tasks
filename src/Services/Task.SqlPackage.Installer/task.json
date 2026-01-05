@@ -10,7 +10,7 @@
   "version": {
     "Major": 1,
     "Minor": 0,
-    "Patch": 15
+    "Patch": 20
   },
   "minimumAgentVersion": "2.144.0",
   "instanceNameFormat": "Use SqlPackage $(versionSpec)",
@@ -28,7 +28,7 @@
       "label": "Version Spec",
       "defaultValue": "latest",
       "required": true,
-      "helpMarkDown": "Version range or exact version of SqlPackage to use. For information about valid version ranges, see [SQLPackage releases](https://docs.microsoft.com/en-us/sql/tools/sqlpackage/sqlpackage-release-notes). Use 'latest' for the most recent version."
+      "helpMarkDown": "Version range or exact version of SqlPackage to use. For information about valid version ranges, see [SqlPackage releases](https://docs.microsoft.com/en-us/sql/tools/sqlpackage/sqlpackage-release-notes). Use 'latest' for the most recent version."
     },
     {
       "name": "checkLatest",

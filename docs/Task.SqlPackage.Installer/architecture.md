@@ -9,7 +9,7 @@ SqlPackage Installer is an Azure DevOps task that downloads, caches, and configu
 ### 1. Task Definition (`task.json`)
 - Defines inputs, outputs, and execution handlers
 - Supports Node 10, 16, and 20 runtimes
-- Version: 1.0.15
+- Version: 1.0.20
 
 ### 2. Main Implementation (`index.ts`)
 Core functions:
