@@ -17,9 +17,11 @@ The Software may be used, copied, modified, and distributed for personal, educat
 - Use of the Software to build, deploy, or maintain commercial products or paid services
 - Use of the Software to provide paid services to third parties
 
+
 For clarity:
-- Use of the Software within any Azure DevOps organization (or similar platform) that is owned, controlled, or paid for by a company, government entity, or other commercial/organizational user, in connection with that entity's projects, products, services, or internal operations, **IS** considered commercial use and requires a commercial license, even if the individual user is not personally paid for that use.
-- Use of the Software in an individual's personal Azure DevOps organization or account for purely personal, educational, hobby, or non-profit projects is **NOT** considered commercial use and is permitted under this license, even if Azure DevOps itself is a commercial platform.
+- Use of the Software within any Azure DevOps organization or account (or similar platform) that is owned, controlled, or paid for by a company, government entity, or other commercial/organizational user, in connection with that entity's projects, products, services, or internal operations, **IS** considered commercial use and requires a commercial license, even if the individual user is not personally paid for that use.
+- Use of the Software in an individual's personal Azure DevOps organization or account (or similar platform) for deliverables that are intended exclusively, or partially, for self-use or the use of third parties, where the deliverable or other derivates result in commercial use **IS ALSO** considered commercial use.
+- Use of the Software in an individual's personal Azure DevOps organization or account (or similar platform) for purely personal, educational, hobby, or non-profit projects **is NOT** considered commercial use and is permitted under this license, even if Azure DevOps itself is a commercial platform.
 - As a rule of thumb, if a project directly or indirectly supports revenue-generating, fee-based, or production business activities, use of the Software for that project is considered commercial use.
 
 ### 3. Attribution Requirement
