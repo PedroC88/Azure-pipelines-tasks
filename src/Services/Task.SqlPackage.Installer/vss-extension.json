@@ -2,7 +2,7 @@
   "manifestVersion": 1,
   "id": "sqlpackage-installer",
   "name": "SqlPackage Installer",
-  "version": "1.0.25",
+  "version": "1.0.26",
   "publisher": "PedroC88",
   "targets": [
     {
@@ -46,10 +46,12 @@
       "path": "SqlPackageInstaller"
     },
     {
-      "path": "overview.md"
+      "path": "overview.md",
+      "addressable": true
     },
     {
-      "path": "icon.png"
+      "path": "icon.png",
+      "addressable": true
     }
   ],
   "contributions": [
