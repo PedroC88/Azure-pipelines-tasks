@@ -303,7 +303,7 @@ async function searchDirectoryRecursively(dirPath: string, executableName: strin
     return null;
 }
 
-async function run() {
+export async function run() {
     try {
         const isDebug = tl.getVariable('System.Debug') === 'true';
 
@@ -383,4 +383,7 @@ async function run() {
     }
 }
 
-run();
+// Only run if not in test mode
+if (process.env.NODE_ENV !== 'test') {
+    run();
+}

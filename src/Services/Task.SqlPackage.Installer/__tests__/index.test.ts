@@ -1,47 +1,66 @@
+// Set test environment BEFORE imports
+process.env.NODE_ENV = 'test';
+
+// Mock modules BEFORE importing to prevent initialization issues
+jest.mock('azure-pipelines-task-lib/task');
+jest.mock('azure-pipelines-tool-lib/tool', () => ({
+  downloadTool: jest.fn(),
+  extractZip: jest.fn(),
+  extract7z: jest.fn(),
+  findLocalTool: jest.fn(),
+  cacheDir: jest.fn(),
+  prependPath: jest.fn()
+}));
+jest.mock('fs');
+
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
-
-// Mock Azure Pipelines task lib and tool lib
-jest.mock('azure-pipelines-task-lib/task');
-jest.mock('azure-pipelines-tool-lib/tool');
-
 import * as tl from 'azure-pipelines-task-lib/task';
-import * as tr from 'azure-pipelines-tool-lib/tool';
+import { run } from '../index';
 
-// Import functions from index.ts that we need to test
-// Note: Since index.ts runs immediately on import, we need to mock first
-const mockGetInput = jest.fn();
-const mockGetBoolInput = jest.fn();
-const mockGetVariable = jest.fn();
-const mockSetVariable = jest.fn();
-const mockSetResult = jest.fn();
-
-(tl.getInput as jest.Mock) = mockGetInput;
-(tl.getBoolInput as jest.Mock) = mockGetBoolInput;
-(tl.getVariable as jest.Mock) = mockGetVariable;
-(tl.setVariable as jest.Mock) = mockSetVariable;
-(tl.setResult as jest.Mock) = mockSetResult;
-(tl.TaskResult as any) = { Succeeded: 0, Failed: 1 };
-
-const mockDownloadTool = jest.fn();
-const mockExtractZip = jest.fn();
-const mockExtract7z = jest.fn();
-const mockFindLocalTool = jest.fn();
-const mockCacheDir = jest.fn();
-const mockPrependPath = jest.fn();
-
-(tr.downloadTool as jest.Mock) = mockDownloadTool;
-(tr.extractZip as jest.Mock) = mockExtractZip;
-(tr.extract7z as jest.Mock) = mockExtract7z;
-(tr.findLocalTool as jest.Mock) = mockFindLocalTool;
-(tr.cacheDir as jest.Mock) = mockCacheDir;
-(tr.prependPath as jest.Mock) = mockPrependPath;
+// Get tool lib mocks without importing the module
+const tr = require('azure-pipelines-tool-lib/tool');
 
 describe('SqlPackage Installer Tests', () => {
+  let mockGetInput: jest.Mock;
+  let mockGetBoolInput: jest.Mock;
+  let mockGetVariable: jest.Mock;
+  let mockSetVariable: jest.Mock;
+  let mockSetResult: jest.Mock;
+  
+  let mockDownloadTool: jest.Mock;
+  let mockExtractZip: jest.Mock;
+  let mockExtract7z: jest.Mock;
+  let mockFindLocalTool: jest.Mock;
+  let mockCacheDir: jest.Mock;
+  let mockPrependPath: jest.Mock;
+  
+  let mockExistsSync: jest.Mock;
+  let mockReaddirSync: jest.Mock;
+  let mockStatSync: jest.Mock;
+
   beforeEach(() => {
     jest.clearAllMocks();
-    mockGetVariable.mockReturnValue('false'); // Debug mode off by default
+    
+    mockGetInput = tl.getInput as jest.Mock;
+    mockGetBoolInput = tl.getBoolInput as jest.Mock;
+    mockGetVariable = tl.getVariable as jest.Mock;
+    mockSetVariable = tl.setVariable as jest.Mock;
+    mockSetResult = tl.setResult as jest.Mock;
+    
+    mockDownloadTool = tr.downloadTool as jest.Mock;
+    mockExtractZip = tr.extractZip as jest.Mock;
+    mockExtract7z = tr.extract7z as jest.Mock;
+    mockFindLocalTool = tr.findLocalTool as jest.Mock;
+    mockCacheDir = tr.cacheDir as jest.Mock;
+    mockPrependPath = tr.prependPath as jest.Mock;
+    
+    mockExistsSync = fs.existsSync as jest.Mock;
+    mockReaddirSync = fs.readdirSync as jest.Mock;
+    mockStatSync = fs.statSync as jest.Mock;
+    
+    mockStatSync.mockReturnValue({ isDirectory: () => false });
   });
 
   describe('Platform Detection', () => {
@@ -138,7 +157,12 @@ describe('SqlPackage Installer Tests', () => {
       // Test that fs.existsSync works correctly
       expect(typeof fs.existsSync).toBe('function');
 
-      // Should return false for non-existent path
+      // With our default mock, fs.existsSync returns true
+      const somePath = path.join('some', 'path');
+      expect(fs.existsSync(somePath)).toBe(true);
+      
+      // We can also test with custom mock behavior
+      mockExistsSync.mockReturnValueOnce(false);
       const nonExistentPath = path.join('non', 'existent', 'path', 'xyz123');
       expect(fs.existsSync(nonExistentPath)).toBe(false);
     });
@@ -386,5 +410,84 @@ describe('SqlPackage Installer Tests', () => {
       expect(mockPrependPath).toHaveBeenCalledWith(toolPath);
     });
   });
-});
 
+  describe('Run Function Integration', () => {
+    it('should successfully install SqlPackage with valid inputs', async () => {
+      mockGetInput.mockImplementation((name: string) => {
+        if (name === 'versionSpec') return 'latest';
+        if (name === 'installDirectory') return '';
+        return '';
+      });
+      mockGetBoolInput.mockReturnValue(false);
+      mockGetVariable.mockReturnValue('false');
+
+      const toolPath = '/cache/SqlPackage/latest/x64';
+      const sqlpackagePath = path.join(toolPath, 'sqlpackage.exe');
+
+      mockFindLocalTool.mockReturnValue(toolPath);
+      mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockReturnValue(['sqlpackage.exe']);
+      mockStatSync.mockReturnValue({
+        isDirectory: () => false,
+        isFile: () => true
+      } as fs.Stats);
+
+      await run();
+
+      expect(mockGetInput).toHaveBeenCalled();
+      expect(mockPrependPath).toHaveBeenCalled();
+      expect(mockSetResult).toHaveBeenCalledWith(
+        tl.TaskResult.Succeeded,
+        'SqlPackage Tool Installer completed successfully'
+      );
+    });
+
+    it('should handle errors gracefully', async () => {
+      mockGetInput.mockImplementation(() => {
+        throw new Error('Input error');
+      });
+
+      await run();
+
+      expect(mockSetResult).toHaveBeenCalledWith(
+        tl.TaskResult.Failed,
+        'Input error'
+      );
+    });
+
+    it('should download and cache when not in cache', async () => {
+      mockGetInput.mockImplementation((name: string) => {
+        if (name === 'versionSpec') return '162.0.52';
+        return '';
+      });
+      mockGetBoolInput.mockReturnValue(false);
+      mockGetVariable.mockReturnValue('false');
+
+      const cachedPath = '/cache/SqlPackage/162.0.52/x64';
+      const sqlpackagePath = path.join(cachedPath, 'sqlpackage.exe');
+
+      // First call: not in cache, subsequent calls: in cache
+      mockFindLocalTool.mockReturnValueOnce('').mockReturnValue(cachedPath);
+      mockDownloadTool.mockResolvedValue('/tmp/sqlpackage.zip');
+      mockExtractZip.mockResolvedValue('/tmp/extracted');
+      mockCacheDir.mockResolvedValue(cachedPath);
+      mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockReturnValue(['sqlpackage.exe']);
+      mockStatSync.mockReturnValue({
+        isDirectory: () => false,
+        isFile: () => true
+      } as fs.Stats);
+
+      await run();
+
+      expect(mockDownloadTool).toHaveBeenCalled();
+      expect(mockExtractZip).toHaveBeenCalled();
+      expect(mockCacheDir).toHaveBeenCalled();
+      expect(mockPrependPath).toHaveBeenCalled();
+      expect(mockSetResult).toHaveBeenCalledWith(
+        tl.TaskResult.Succeeded,
+        'SqlPackage Tool Installer completed successfully'
+      );
+    });
+  });
+});
