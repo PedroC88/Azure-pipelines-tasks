@@ -10,21 +10,10 @@
   "version": {
     "Major": 0,
     "Minor": 0,
-    "Patch": 1
+    "Patch": 2
   },
   "instanceNameFormat": "Deploy $(dacpacFile) to $(databaseName)",
   "inputs": [
-    {
-      "name": "deployMethod",
-      "type": "pickList",
-      "label": "Deploy SQL Using",
-      "defaultValue": "DacpacFile",
-      "required": true,
-      "helpMarkDown": "Specify the deployment method",
-      "options": {
-        "DacpacFile": "Sql Dacpac"
-      }
-    },
     {
       "name": "dacpacFile",
       "type": "filePath",
