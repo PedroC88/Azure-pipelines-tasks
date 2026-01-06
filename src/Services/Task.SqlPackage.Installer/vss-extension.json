@@ -2,7 +2,7 @@
   "manifestVersion": 1,
   "id": "sqlpackage-installer",
   "name": "SqlPackage Installer",
-  "version": "1.0.32",
+  "version": "1.0.33",
   "publisher": "PedroC88",
   "targets": [
     {

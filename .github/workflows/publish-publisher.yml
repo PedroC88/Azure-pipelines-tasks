@@ -2,8 +2,6 @@ name: Build and Publish SqlPackage Publisher
 
 on:
   push:
-    branches:
-      - develop
     paths:
       - 'src/Services/Task.SqlPackage.Publisher/**'
       - '.github/workflows/publish-publisher.yml'
@@ -142,7 +140,7 @@ jobs:
   publish:
     runs-on: windows-latest
     needs: build
-    if: (needs.build.outputs.version_changed == 'true' || github.event.inputs.force_publish == 'true') && github.ref == 'refs/heads/develop'
+    if: needs.build.outputs.version_changed == 'true' || github.event.inputs.force_publish == 'true'
 
     steps:
     - name: Download VSIX artifact
