@@ -17,21 +17,24 @@ import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
 import * as tl from 'azure-pipelines-task-lib/task';
-import { run } from '../index';
 
-// Get tool lib mocks without importing the module
+// Import source AFTER mocks - critical for coverage!
+const indexModule = require('../index');
+const { run } = indexModule;
+
+// Get tool lib mocks
 const tr = require('azure-pipelines-tool-lib/tool');
 
 describe('SqlPackage Installer Tests', () => {
   let mockGetInput: jest.Mock;
   let mockGetBoolInput: jest.Mock;
   let mockGetVariable: jest.Mock;
-  let mockSetVariable: jest.Mock;
+  let _mockSetVariable: jest.Mock;
   let mockSetResult: jest.Mock;
 
   let mockDownloadTool: jest.Mock;
   let mockExtractZip: jest.Mock;
-  let mockExtract7z: jest.Mock;
+  let _mockExtract7z: jest.Mock;
   let mockFindLocalTool: jest.Mock;
   let mockCacheDir: jest.Mock;
   let mockPrependPath: jest.Mock;
@@ -46,12 +49,12 @@ describe('SqlPackage Installer Tests', () => {
     mockGetInput = tl.getInput as jest.Mock;
     mockGetBoolInput = tl.getBoolInput as jest.Mock;
     mockGetVariable = tl.getVariable as jest.Mock;
-    mockSetVariable = tl.setVariable as jest.Mock;
+    _mockSetVariable = tl.setVariable as jest.Mock;
     mockSetResult = tl.setResult as jest.Mock;
 
     mockDownloadTool = tr.downloadTool as jest.Mock;
     mockExtractZip = tr.extractZip as jest.Mock;
-    mockExtract7z = tr.extract7z as jest.Mock;
+    _mockExtract7z = tr.extract7z as jest.Mock;
     mockFindLocalTool = tr.findLocalTool as jest.Mock;
     mockCacheDir = tr.cacheDir as jest.Mock;
     mockPrependPath = tr.prependPath as jest.Mock;
@@ -60,6 +63,9 @@ describe('SqlPackage Installer Tests', () => {
     mockReaddirSync = fs.readdirSync as jest.Mock;
     mockStatSync = fs.statSync as jest.Mock;
 
+    // Set default return values for fs mocks
+    mockExistsSync.mockReturnValue(true);
+    mockReaddirSync.mockReturnValue([]);
     mockStatSync.mockReturnValue({ isDirectory: () => false });
   });
 
@@ -422,7 +428,6 @@ describe('SqlPackage Installer Tests', () => {
       mockGetVariable.mockReturnValue('false');
 
       const toolPath = '/cache/SqlPackage/latest/x64';
-      const sqlpackagePath = path.join(toolPath, 'sqlpackage.exe');
 
       mockFindLocalTool.mockReturnValue(toolPath);
       mockExistsSync.mockReturnValue(true);
@@ -464,7 +469,6 @@ describe('SqlPackage Installer Tests', () => {
       mockGetVariable.mockReturnValue('false');
 
       const cachedPath = '/cache/SqlPackage/162.0.52/x64';
-      const sqlpackagePath = path.join(cachedPath, 'sqlpackage.exe');
 
       // First call: not in cache, subsequent calls: in cache
       mockFindLocalTool.mockReturnValueOnce('').mockReturnValue(cachedPath);

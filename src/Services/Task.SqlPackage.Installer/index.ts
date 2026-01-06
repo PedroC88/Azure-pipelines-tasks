@@ -64,7 +64,12 @@ async function getAvailableVersions(): Promise<SqlPackageVersion[]> {
     }
 }
 
-function findAssetForPlatform(assets: any[], platform: string): any {
+interface GitHubAsset {
+    name: string;
+    browser_download_url: string;
+}
+
+function findAssetForPlatform(assets: GitHubAsset[], platform: string): GitHubAsset | undefined {
     const platformKeywords: { [key: string]: string[] } = {
         'win32': ['win', 'windows'],
         'linux': ['linux'],
@@ -80,7 +85,7 @@ function findAssetForPlatform(assets: any[], platform: string): any {
         }
     }
 
-    return null;
+    return undefined;
 }
 
 function getDefaultVersions(): SqlPackageVersion[] {
@@ -377,9 +382,10 @@ export async function run() {
         console.log(`SqlPackage is ready at: ${toolPath}`);
         tl.setResult(tl.TaskResult.Succeeded, 'SqlPackage Tool Installer completed successfully');
 
-    } catch (err: any) {
-        console.error(`Error: ${err.message}`);
-        tl.setResult(tl.TaskResult.Failed, err.message);
+    } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        console.error(`Error: ${errorMessage}`);
+        tl.setResult(tl.TaskResult.Failed, errorMessage);
     }
 }
 
