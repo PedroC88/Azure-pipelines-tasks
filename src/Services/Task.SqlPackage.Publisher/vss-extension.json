@@ -1,15 +1,15 @@
 {
   "manifestVersion": 1,
-  "id": "sqlpackage-installer",
-  "name": "SqlPackage Installer",
-  "version": "1.0.22",
+  "id": "sqlpackage-publisher",
+  "name": "SqlPackage Publisher",
+  "version": "0.0.1",
   "publisher": "PedroC88",
   "targets": [
     {
       "id": "Microsoft.VisualStudio.Services"
     }
   ],
-  "description": "Installs a specific version of SqlPackage from the internet or the tools cache and adds it to the PATH. Use this task to change the version of SqlPackage used in subsequent tasks.",
+  "description": "Deploy SQL Server dacpac files using SqlPackage. Cross-platform support for Windows, Linux, and macOS agents.",
   "categories": [
     "Azure Pipelines"
   ],
@@ -19,7 +19,8 @@
     "Deploy",
     "SqlPackage",
     "Database",
-    "Tool Installer"
+    "DACPAC",
+    "SQL Server"
   ],
   "content": {
     "details": {
@@ -43,7 +44,7 @@
   },
   "files": [
     {
-      "path": "SqlPackageInstaller"
+      "path": "SqlPackagePublisher"
     },
     {
       "path": "overview.md"
@@ -54,13 +55,13 @@
   ],
   "contributions": [
     {
-      "id": "sqlpackage-installer-task",
+      "id": "sqlpackage-publisher-task",
       "type": "ms.vss-distributed-task.task",
       "targets": [
         "ms.vss-distributed-task.tasks"
       ],
       "properties": {
-        "name": "SqlPackageInstaller"
+        "name": "SqlPackagePublisher"
       }
     }
   ]

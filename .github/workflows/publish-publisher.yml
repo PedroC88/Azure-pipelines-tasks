@@ -1,9 +1,12 @@
-name: Build and Publish Extension
+name: Build and Publish SqlPackage Publisher
 
 on:
   push:
     branches:
       - develop
+    paths:
+      - 'src/Services/Task.SqlPackage.Publisher/**'
+      - '.github/workflows/publish-publisher.yml'
   workflow_dispatch: # Allows manual trigger
     inputs:
       force_publish:
@@ -28,44 +31,36 @@ jobs:
       with:
         node-version: '20'
         cache: 'npm'
-        cache-dependency-path: src/Services/Task.SqlPackage.Installer/package-lock.json
+        cache-dependency-path: src/Services/Task.SqlPackage.Publisher/package-lock.json
 
     - name: Install dependencies
-      working-directory: src/Services/Task.SqlPackage.Installer
+      working-directory: src/Services/Task.SqlPackage.Publisher
       run: npm ci
 
     - name: Lint code
-      working-directory: src/Services/Task.SqlPackage.Installer
+      working-directory: src/Services/Task.SqlPackage.Publisher
       run: npm run lint
 
     - name: Run tests
-      working-directory: src/Services/Task.SqlPackage.Installer
-      run: npm run test:coverage
-
-    - name: Upload coverage to Coveralls
-      uses: coverallsapp/github-action@v2
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        path-to-lcov: ./src/Services/Task.SqlPackage.Installer/coverage/lcov.info
-        flag-name: unittests
-        parallel: false
+      working-directory: src/Services/Task.SqlPackage.Publisher
+      run: npm test
 
     - name: Build extension
-      working-directory: src/Services/Task.SqlPackage.Installer
+      working-directory: src/Services/Task.SqlPackage.Publisher
       run: npm run build
 
     - name: Create VSIX package
-      working-directory: src/Services/Task.SqlPackage.Installer
+      working-directory: src/Services/Task.SqlPackage.Publisher
       run: npm run package
 
     - name: Restore modules (cleanup)
-      working-directory: src/Services/Task.SqlPackage.Installer
+      working-directory: src/Services/Task.SqlPackage.Publisher
       run: npm run restore-modules
       if: always()
 
     - name: Get extension version
       id: get_version
-      working-directory: src/Services/Task.SqlPackage.Installer
+      working-directory: src/Services/Task.SqlPackage.Publisher
       shell: pwsh
       run: |
         $manifest = Get-Content vss-extension.json | ConvertFrom-Json
@@ -85,17 +80,17 @@ jobs:
         }
 
         try {
-          # Get the latest release version from GitHub
-          echo "Checking for existing releases..."
-          $latestRelease = gh release view --json tagName --jq .tagName 2>&1
+          # Get the latest release version from GitHub for Publisher
+          echo "Checking for existing Publisher releases..."
+          $latestRelease = gh release list --json tagName,name --jq '.[] | select(.name | contains("Publisher")) | .tagName' | Select-Object -First 1 2>&1
           $ghExitCode = $LASTEXITCODE
 
           if ($ghExitCode -eq 0 -and $latestRelease) {
-            $latestVersion = $latestRelease -replace '^v', ''
+            $latestVersion = $latestRelease -replace '^publisher-v', ''
             $currentVersion = "${{ steps.get_version.outputs.version }}"
 
-            echo "::notice::Latest published version: $latestVersion"
-            echo "::notice::Current version: $currentVersion"
+            echo "::notice::Latest published Publisher version: $latestVersion"
+            echo "::notice::Current Publisher version: $currentVersion"
 
             # Use string comparison - we only care if versions are exactly equal
             # If they differ at all (even if not semantically newer), allow publish
@@ -109,7 +104,7 @@ jobs:
           } else {
             # No releases yet, allow publishing
             echo "version_changed=true" >> $env:GITHUB_OUTPUT
-            echo "::notice::No previous releases found - will publish version ${{ steps.get_version.outputs.version }}"
+            echo "::notice::No previous Publisher releases found - will publish version ${{ steps.get_version.outputs.version }}"
           }
 
           # Explicitly exit successfully
@@ -125,13 +120,13 @@ jobs:
     - name: Upload VSIX artifact
       uses: actions/upload-artifact@v4
       with:
-        name: vsix-package
-        path: src/Services/Task.SqlPackage.Installer/*.vsix
+        name: publisher-vsix-package
+        path: src/Services/Task.SqlPackage.Publisher/*.vsix
         retention-days: 30
 
     - name: Publish to Marketplace
       if: (steps.version_check.outputs.version_changed == 'true' || github.event.inputs.force_publish == 'true') && github.ref == 'refs/heads/develop'
-      working-directory: src/Services/Task.SqlPackage.Installer
+      working-directory: src/Services/Task.SqlPackage.Publisher
       env:
         AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
       run: |
@@ -140,26 +135,28 @@ jobs:
           echo "::error::Visit: https://github.com/${{ github.repository }}/settings/secrets/actions"
           exit 1
         }
-        echo "::notice::Publishing extension to Azure DevOps Marketplace..."
+        echo "::notice::Publishing Publisher extension to Azure DevOps Marketplace..."
         npx tfx extension publish --vsix (Get-ChildItem -Filter *.vsix | Select-Object -First 1).Name --token $env:AZURE_DEVOPS_PAT --no-prompt
         if ($LASTEXITCODE -ne 0) {
-          echo "::error::Failed to publish extension to marketplace"
+          echo "::error::Failed to publish Publisher extension to marketplace"
           exit 1
         }
-        echo "::notice::Successfully published to marketplace"
+        echo "::notice::Successfully published Publisher to marketplace"
       shell: pwsh
 
     - name: Create GitHub Release
       if: (steps.version_check.outputs.version_changed == 'true' || github.event.inputs.force_publish == 'true') && github.ref == 'refs/heads/develop'
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: v${{ steps.get_version.outputs.version }}
-        name: Release v${{ steps.get_version.outputs.version }}
+        tag_name: publisher-v${{ steps.get_version.outputs.version }}
+        name: SqlPackage Publisher v${{ steps.get_version.outputs.version }}
         body: |
-          Automated release from develop branch
+          Automated release of SqlPackage Publisher from develop branch
 
           Extension version: ${{ steps.get_version.outputs.version }}
-        files: src/Services/Task.SqlPackage.Installer/*.vsix
+
+          This extension deploys DACPAC files using SqlPackage with support for multiple authentication methods.
+        files: src/Services/Task.SqlPackage.Publisher/*.vsix
         draft: false
         prerelease: false
       env:

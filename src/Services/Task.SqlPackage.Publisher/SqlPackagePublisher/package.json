@@ -1,0 +1,32 @@
+{
+  "name": "sqlpackage-publisher",
+  "version": "0.0.1",
+  "description": "Azure Pipelines task to deploy SQL Server dacpac files using SqlPackage",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "lint": "eslint .",
+    "clean": "node -e \"const fs=require('fs');['dist','lib','node_modules_minimal','node_modules_temp','coverage'].forEach(d=>{try{fs.rmSync(d,{recursive:true,force:true})}catch(e){}});fs.readdirSync('.').filter(f=>f.endsWith('.vsix')).forEach(f=>fs.unlinkSync(f))\"",
+    "prepare-minimal": "powershell -ExecutionPolicy Bypass -File prepare-minimal.ps1",
+    "restore-modules": "powershell -ExecutionPolicy Bypass -File restore-modules.ps1",
+    "prepackage": "npm run build && npm run prepare-minimal",
+    "package": "npx tfx-cli extension create --manifest-globs vss-extension.json --output-path .",
+    "postpackage": "npm run restore-modules"
+  },
+  "author": "PedroC88",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "azure-pipelines-task-lib": "^5.2.4"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.19.1",
+    "@typescript-eslint/parser": "^8.19.1",
+    "eslint": "^9.17.0",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.2.5",
+    "typescript": "^5.7.2"
+  }
+}

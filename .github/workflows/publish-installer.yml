@@ -1,0 +1,171 @@
+name: Build and Publish SqlPackage Installer
+
+on:
+  push:
+    branches:
+      - develop
+    paths:
+      - 'src/Services/Task.SqlPackage.Installer/**'
+      - '.github/workflows/publish-extension.yml'
+  workflow_dispatch: # Allows manual trigger
+    inputs:
+      force_publish:
+        description: 'Force publish even if version unchanged'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-publish:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: src/Services/Task.SqlPackage.Installer/package-lock.json
+
+    - name: Install dependencies
+      working-directory: src/Services/Task.SqlPackage.Installer
+      run: npm ci
+
+    - name: Lint code
+      working-directory: src/Services/Task.SqlPackage.Installer
+      run: npm run lint
+
+    - name: Run tests
+      working-directory: src/Services/Task.SqlPackage.Installer
+      run: npm run test:coverage
+
+    - name: Upload coverage to Coveralls
+      uses: coverallsapp/github-action@v2
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        path-to-lcov: ./src/Services/Task.SqlPackage.Installer/coverage/lcov.info
+        flag-name: installer-unittests
+        parallel: false
+
+    - name: Build extension
+      working-directory: src/Services/Task.SqlPackage.Installer
+      run: npm run build
+
+    - name: Create VSIX package
+      working-directory: src/Services/Task.SqlPackage.Installer
+      run: npm run package
+
+    - name: Restore modules (cleanup)
+      working-directory: src/Services/Task.SqlPackage.Installer
+      run: npm run restore-modules
+      if: always()
+
+    - name: Get extension version
+      id: get_version
+      working-directory: src/Services/Task.SqlPackage.Installer
+      shell: pwsh
+      run: |
+        $manifest = Get-Content vss-extension.json | ConvertFrom-Json
+        $version = $manifest.version
+        echo "version=$version" >> $env:GITHUB_OUTPUT
+        echo "Extension version: $version"
+
+    - name: Check if version changed
+      id: version_check
+      shell: pwsh
+      run: |
+        # Only check version on develop branch
+        if ("${{ github.ref }}" -ne "refs/heads/develop") {
+          echo "::notice::Not on develop branch - skipping version check and publish"
+          echo "version_changed=false" >> $env:GITHUB_OUTPUT
+          exit 0
+        }
+
+        try {
+          # Get the latest release version from GitHub for Installer
+          echo "Checking for existing Installer releases..."
+          $latestRelease = gh release list --json tagName,name --jq '.[] | select(.name | contains("Installer")) | .tagName' | Select-Object -First 1 2>&1
+          $ghExitCode = $LASTEXITCODE
+
+          if ($ghExitCode -eq 0 -and $latestRelease) {
+            $latestVersion = $latestRelease -replace '^installer-v', ''
+            $currentVersion = "${{ steps.get_version.outputs.version }}"
+
+            echo "::notice::Latest published Installer version: $latestVersion"
+            echo "::notice::Current Installer version: $currentVersion"
+
+            # Use string comparison - we only care if versions are exactly equal
+            # If they differ at all (even if not semantically newer), allow publish
+            if ($latestVersion -eq $currentVersion) {
+              echo "version_changed=false" >> $env:GITHUB_OUTPUT
+              echo "::notice::Version unchanged ($currentVersion) - skipping publish"
+            } else {
+              echo "version_changed=true" >> $env:GITHUB_OUTPUT
+              echo "::notice::Version changed from $latestVersion to $currentVersion - will publish"
+            }
+          } else {
+            # No releases yet, allow publishing
+            echo "version_changed=true" >> $env:GITHUB_OUTPUT
+            echo "::notice::No previous Installer releases found - will publish version ${{ steps.get_version.outputs.version }}"
+          }
+
+          # Explicitly exit successfully
+          exit 0
+        } catch {
+          # If there's an error checking releases, fail the workflow
+          echo "::error::Failed to check releases: $_"
+          exit 1
+        }
+      env:
+        GH_TOKEN: ${{ github.token }}
+
+    - name: Upload VSIX artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: installer-vsix-package
+        path: src/Services/Task.SqlPackage.Installer/*.vsix
+        retention-days: 30
+
+    - name: Publish to Marketplace
+      if: (steps.version_check.outputs.version_changed == 'true' || github.event.inputs.force_publish == 'true') && github.ref == 'refs/heads/develop'
+      working-directory: src/Services/Task.SqlPackage.Installer
+      env:
+        AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+      run: |
+        if ([string]::IsNullOrEmpty($env:AZURE_DEVOPS_PAT)) {
+          echo "::error::AZURE_DEVOPS_PAT secret is not configured. Please add it to repository secrets."
+          echo "::error::Visit: https://github.com/${{ github.repository }}/settings/secrets/actions"
+          exit 1
+        }
+        echo "::notice::Publishing Installer extension to Azure DevOps Marketplace..."
+        npx tfx extension publish --vsix (Get-ChildItem -Filter *.vsix | Select-Object -First 1).Name --token $env:AZURE_DEVOPS_PAT --no-prompt
+        if ($LASTEXITCODE -ne 0) {
+          echo "::error::Failed to publish Installer extension to marketplace"
+          exit 1
+        }
+        echo "::notice::Successfully published Installer to marketplace"
+      shell: pwsh
+
+    - name: Create GitHub Release
+      if: (steps.version_check.outputs.version_changed == 'true' || github.event.inputs.force_publish == 'true') && github.ref == 'refs/heads/develop'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: installer-v${{ steps.get_version.outputs.version }}
+        name: SqlPackage Installer v${{ steps.get_version.outputs.version }}
+        body: |
+          Automated release of SqlPackage Installer from develop branch
+
+          Extension version: ${{ steps.get_version.outputs.version }}
+
+          This extension installs SqlPackage and adds it to the PATH for use in subsequent pipeline steps.
+        files: src/Services/Task.SqlPackage.Installer/*.vsix
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
