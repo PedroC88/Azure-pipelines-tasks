@@ -1,11 +1,12 @@
 {
   "name": "sqlpackage-publisher",
-  "version": "0.0.2",
+  "version": "0.0.6",
   "description": "Azure Pipelines task to deploy SQL Server dacpac files using SqlPackage",
   "main": "index.js",
   "scripts": {
     "build": "tsc",
     "test": "jest",
+    "test:coverage": "jest --coverage",
     "lint": "eslint .",
     "clean": "node -e \"const fs=require('fs');['dist','lib','node_modules_minimal','node_modules_temp','coverage'].forEach(d=>{try{fs.rmSync(d,{recursive:true,force:true})}catch(e){}});fs.readdirSync('.').filter(f=>f.endsWith('.vsix')).forEach(f=>fs.unlinkSync(f))\"",
     "prepare-minimal": "powershell -ExecutionPolicy Bypass -File prepare-minimal.ps1",

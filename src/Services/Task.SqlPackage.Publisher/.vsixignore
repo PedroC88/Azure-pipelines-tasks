@@ -8,14 +8,10 @@ tsconfig.json
 test.ps1
 run.ps1
 .gitignore
-example-pipeline.yml
 package-lock.json
-temp/**
-tools/**
-custom-sqlpackage/**
 *.vsix
 node_modules_minimal/**
-node_modules_full/**
+node_modules_temp/**
 
 # Important: DO NOT exclude overview.md and icon.png at root
 !overview.md

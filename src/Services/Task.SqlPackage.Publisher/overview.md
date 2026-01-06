@@ -205,7 +205,7 @@ variables:
 
 ## 📄 License
 
-Custom non-commercial license - free for personal use. See [LICENSE](https://github.com/PedroC88/Azure-pipelines-tasks/blob/main/LICENSE) for details.
+Custom non-commercial license - free for personal use. See [LICENSE](https://github.com/PedroC88/Azure-pipelines-tasks/blob/develop/LICENSE) for details.
 
 ---
 
