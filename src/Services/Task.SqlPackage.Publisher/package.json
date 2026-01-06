@@ -6,6 +6,7 @@
   "scripts": {
     "build": "tsc",
     "test": "jest",
+    "test:coverage": "jest --coverage",
     "lint": "eslint .",
     "clean": "node -e \"const fs=require('fs');['dist','lib','node_modules_minimal','node_modules_temp','coverage'].forEach(d=>{try{fs.rmSync(d,{recursive:true,force:true})}catch(e){}});fs.readdirSync('.').filter(f=>f.endsWith('.vsix')).forEach(f=>fs.unlinkSync(f))\"",
     "prepare-minimal": "powershell -ExecutionPolicy Bypass -File prepare-minimal.ps1",
