@@ -2,7 +2,7 @@
   "manifestVersion": 1,
   "id": "sqlpackage-installer",
   "name": "SqlPackage Installer",
-  "version": "1.0.22",
+  "version": "1.0.21",
   "publisher": "PedroC88",
   "targets": [
     {
@@ -23,7 +23,7 @@
   ],
   "content": {
     "details": {
-      "path": "overview.md"
+      "path": "README.md"
     }
   },
   "links": {
@@ -46,7 +46,7 @@
       "path": "SqlPackageInstaller"
     },
     {
-      "path": "overview.md"
+      "path": "README.md"
     },
     {
       "path": "icon.png"
