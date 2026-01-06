@@ -9,18 +9,7 @@ module.exports = {
     '!**/node_modules/**',
   ],
   transform: {
-    '^.+\\.ts$': ['ts-jest', {
-      tsconfig: {
-        target: 'ES2017',
-        module: 'commonjs',
-        lib: ['ES2017'],
-        strict: true,
-        esModuleInterop: true,
-        skipLibCheck: true,
-        forceConsistentCasingInFileNames: true,
-        moduleResolution: 'node',
-      },
-    }],
+    '^.+\\.ts$': 'ts-jest',
   },
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
