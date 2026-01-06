@@ -2,7 +2,7 @@
   "manifestVersion": 1,
   "id": "sqlpackage-publisher",
   "name": "SqlPackage Publisher",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "publisher": "PedroC88",
   "targets": [
     {
