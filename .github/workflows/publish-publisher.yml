@@ -25,7 +25,6 @@ jobs:
     runs-on: windows-latest
     outputs:
       version: ${{ steps.get_version.outputs.version }}
-      version_changed: ${{ steps.version_check.outputs.version_changed }}
 
     steps:
     - name: Checkout code
@@ -81,17 +80,23 @@ jobs:
         echo "version=$version" >> $env:GITHUB_OUTPUT
         echo "Extension version: $version"
 
+    - name: Upload VSIX artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: publisher-vsix-package
+        path: src/Services/Task.SqlPackage.Publisher/*.vsix
+        retention-days: 30
+
+  publish:
+    runs-on: windows-latest
+    needs: build
+    if: github.ref == 'refs/heads/develop'
+
+    steps:
     - name: Check if version changed
       id: version_check
       shell: pwsh
       run: |
-        # Only check version on develop branch
-        if ("${{ github.ref }}" -ne "refs/heads/develop") {
-          echo "::notice::Not on develop branch - skipping version check and publish"
-          echo "version_changed=false" >> $env:GITHUB_OUTPUT
-          exit 0
-        }
-
         try {
           # Get the latest release version from GitHub for Publisher
           echo "Checking for existing Publisher releases..."
@@ -100,24 +105,23 @@ jobs:
 
           if ($ghExitCode -eq 0 -and $latestRelease) {
             $latestVersion = $latestRelease -replace '^publisher-v', ''
-            $currentVersion = "${{ steps.get_version.outputs.version }}"
+            $currentVersion = "${{ needs.build.outputs.version }}"
 
             echo "::notice::Latest published Publisher version: $latestVersion"
             echo "::notice::Current Publisher version: $currentVersion"
 
             # Use string comparison - we only care if versions are exactly equal
-            # If they differ at all (even if not semantically newer), allow publish
-            if ($latestVersion -eq $currentVersion) {
-              echo "version_changed=false" >> $env:GITHUB_OUTPUT
+            if ($latestVersion -eq $currentVersion -and "${{ github.event.inputs.force_publish }}" -ne "true") {
               echo "::notice::Version unchanged ($currentVersion) - skipping publish"
+              echo "SKIP_PUBLISH=true" >> $env:GITHUB_ENV
             } else {
-              echo "version_changed=true" >> $env:GITHUB_OUTPUT
               echo "::notice::Version changed from $latestVersion to $currentVersion - will publish"
+              echo "SKIP_PUBLISH=false" >> $env:GITHUB_ENV
             }
           } else {
             # No releases yet, allow publishing
-            echo "version_changed=true" >> $env:GITHUB_OUTPUT
-            echo "::notice::No previous Publisher releases found - will publish version ${{ steps.get_version.outputs.version }}"
+            echo "::notice::No previous Publisher releases found - will publish version ${{ needs.build.outputs.version }}"
+            echo "SKIP_PUBLISH=false" >> $env:GITHUB_ENV
           }
 
           # Explicitly exit successfully
@@ -130,25 +134,14 @@ jobs:
       env:
         GH_TOKEN: ${{ github.token }}
 
-    - name: Upload VSIX artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: publisher-vsix-package
-        path: src/Services/Task.SqlPackage.Publisher/*.vsix
-        retention-days: 30
-
-  publish:
-    runs-on: windows-latest
-    needs: build
-    if: github.event_name == 'pull_request' || needs.build.outputs.version_changed == 'true' || github.event.inputs.force_publish == 'true'
-
-    steps:
     - name: Download VSIX artifact
+      if: env.SKIP_PUBLISH != 'true'
       uses: actions/download-artifact@v4
       with:
         name: publisher-vsix-package
 
     - name: Publish to Marketplace
+      if: env.SKIP_PUBLISH != 'true'
       env:
         AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
       run: |
@@ -167,6 +160,7 @@ jobs:
       shell: pwsh
 
     - name: Create GitHub Release
+      if: env.SKIP_PUBLISH != 'true'
       uses: softprops/action-gh-release@v1
       with:
         tag_name: publisher-v${{ needs.build.outputs.version }}
