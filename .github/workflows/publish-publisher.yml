@@ -7,6 +7,10 @@ on:
     paths:
       - 'src/Services/Task.SqlPackage.Publisher/**'
       - '.github/workflows/publish-publisher.yml'
+  pull_request:
+    paths:
+      - 'src/Services/Task.SqlPackage.Publisher/**'
+      - '.github/workflows/publish-publisher.yml'
   workflow_dispatch: # Allows manual trigger
     inputs:
       force_publish:
