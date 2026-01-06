@@ -11,4 +11,4 @@ Installing this extension **DOES NOT** make SqlPackage available for the Microso
 ## SqlPackage.Publisher
 This extension uses the SqlPackage binary available in the session to publish a DacPac from the console, the task has an UI and yaml parameters similar to Microsoft Sql Deployment task to make it easy to transition from that task to this one, however they don't work the same.
 
-This task can be used on systems without SqlPackge by using the companion installer task. It can also be used on systems with SqlPackage pre-installed as long as the executable is available on the session context (ej.: the PATH variable on Windows systems).
+This task can be used on systems without SqlPackage by using the companion installer task. It can also be used on systems with SqlPackage pre-installed as long as the executable is available on the session context (ej.: the PATH variable on Windows systems).
