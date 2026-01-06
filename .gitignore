@@ -155,3 +155,7 @@ lerna-debug.log*
 
 # Azure extension packages
 *.vsix
+
+# Azure DevOps task key files
+.taskkey
+**/.taskkey

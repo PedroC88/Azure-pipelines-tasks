@@ -1,0 +1,68 @@
+{
+  "manifestVersion": 1,
+  "id": "sqlpackage-publisher",
+  "name": "SqlPackage Publisher",
+  "version": "0.0.1",
+  "publisher": "PedroC88",
+  "targets": [
+    {
+      "id": "Microsoft.VisualStudio.Services"
+    }
+  ],
+  "description": "Deploy SQL Server dacpac files using SqlPackage. Cross-platform support for Windows, Linux, and macOS agents.",
+  "categories": [
+    "Azure Pipelines"
+  ],
+  "tags": [
+    "Build",
+    "Release",
+    "Deploy",
+    "SqlPackage",
+    "Database",
+    "DACPAC",
+    "SQL Server"
+  ],
+  "content": {
+    "details": {
+      "path": "overview.md"
+    }
+  },
+  "links": {
+    "getstarted": {
+      "uri": "https://github.com/PedroC88/Azure-pipelines-tasks"
+    },
+    "support": {
+      "uri": "https://github.com/PedroC88/Azure-pipelines-tasks/issues"
+    }
+  },
+  "branding": {
+    "color": "rgb(0, 120, 212)",
+    "theme": "light"
+  },
+  "icons": {
+    "default": "icon.png"
+  },
+  "files": [
+    {
+      "path": "SqlPackagePublisher"
+    },
+    {
+      "path": "overview.md"
+    },
+    {
+      "path": "icon.png"
+    }
+  ],
+  "contributions": [
+    {
+      "id": "sqlpackage-publisher-task",
+      "type": "ms.vss-distributed-task.task",
+      "targets": [
+        "ms.vss-distributed-task.tasks"
+      ],
+      "properties": {
+        "name": "SqlPackagePublisher"
+      }
+    }
+  ]
+}
