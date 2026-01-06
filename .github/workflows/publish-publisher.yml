@@ -2,6 +2,8 @@ name: Build and Publish SqlPackage Publisher
 
 on:
   push:
+    branches:
+      - develop
     paths:
       - 'src/Services/Task.SqlPackage.Publisher/**'
       - '.github/workflows/publish-publisher.yml'
