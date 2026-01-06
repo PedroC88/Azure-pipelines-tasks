@@ -28,38 +28,38 @@ describe('SqlPackage Installer Tests', () => {
   let mockGetVariable: jest.Mock;
   let mockSetVariable: jest.Mock;
   let mockSetResult: jest.Mock;
-  
+
   let mockDownloadTool: jest.Mock;
   let mockExtractZip: jest.Mock;
   let mockExtract7z: jest.Mock;
   let mockFindLocalTool: jest.Mock;
   let mockCacheDir: jest.Mock;
   let mockPrependPath: jest.Mock;
-  
+
   let mockExistsSync: jest.Mock;
   let mockReaddirSync: jest.Mock;
   let mockStatSync: jest.Mock;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     mockGetInput = tl.getInput as jest.Mock;
     mockGetBoolInput = tl.getBoolInput as jest.Mock;
     mockGetVariable = tl.getVariable as jest.Mock;
     mockSetVariable = tl.setVariable as jest.Mock;
     mockSetResult = tl.setResult as jest.Mock;
-    
+
     mockDownloadTool = tr.downloadTool as jest.Mock;
     mockExtractZip = tr.extractZip as jest.Mock;
     mockExtract7z = tr.extract7z as jest.Mock;
     mockFindLocalTool = tr.findLocalTool as jest.Mock;
     mockCacheDir = tr.cacheDir as jest.Mock;
     mockPrependPath = tr.prependPath as jest.Mock;
-    
+
     mockExistsSync = fs.existsSync as jest.Mock;
     mockReaddirSync = fs.readdirSync as jest.Mock;
     mockStatSync = fs.statSync as jest.Mock;
-    
+
     mockStatSync.mockReturnValue({ isDirectory: () => false });
   });
 
@@ -160,7 +160,7 @@ describe('SqlPackage Installer Tests', () => {
       // With our default mock, fs.existsSync returns true
       const somePath = path.join('some', 'path');
       expect(fs.existsSync(somePath)).toBe(true);
-      
+
       // We can also test with custom mock behavior
       mockExistsSync.mockReturnValueOnce(false);
       const nonExistentPath = path.join('non', 'existent', 'path', 'xyz123');
