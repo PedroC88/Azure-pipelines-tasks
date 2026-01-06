@@ -1,190 +1,462 @@
-import * as tl from 'azure-pipelines-task-lib/task';
-import * as path from 'path';
+// Set test environment BEFORE imports
+process.env.NODE_ENV = 'test';
 
-// Mock azure-pipelines-task-lib
+import * as tl from 'azure-pipelines-task-lib/task';
+import * as fs from 'fs';
+import { run } from '../index';
+
+// Mock modules
 jest.mock('azure-pipelines-task-lib/task');
+jest.mock('fs');
 
 describe('SqlPackage Publisher Tests', () => {
+    let mockGetInput: jest.Mock;
+    let mockGetPathInput: jest.Mock;
+    let mockExec: jest.Mock;
+    let mockSetResult: jest.Mock;
+    let mockExistsSync: jest.Mock;
+    let consoleLogSpy: jest.SpyInstance;
+    let consoleErrorSpy: jest.SpyInstance;
+
     beforeEach(() => {
         jest.clearAllMocks();
+        jest.resetModules();
+
+        mockGetInput = tl.getInput as jest.Mock;
+        mockGetPathInput = tl.getPathInput as jest.Mock;
+        mockExec = tl.exec as jest.Mock;
+        mockSetResult = tl.setResult as jest.Mock;
+        mockExistsSync = fs.existsSync as jest.Mock;
+
+        consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+        consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+        // Default successful responses
+        mockExec.mockResolvedValue(0);
+        mockExistsSync.mockReturnValue(true);
+    });
+
+    afterEach(() => {
+        consoleLogSpy.mockRestore();
+        consoleErrorSpy.mockRestore();
     });
 
     describe('Input Validation', () => {
-        it('should require dacpacFile input', () => {
-            const mockGetInput = tl.getInput as jest.Mock;
-            const mockGetPathInput = tl.getPathInput as jest.Mock;
-
-            mockGetInput.mockReturnValue('DacpacFile');
-            mockGetPathInput.mockReturnValue(null);
-
-            expect(mockGetPathInput).toBeDefined();
-        });
-
-        it('should accept valid server name', () => {
-            const mockGetInput = tl.getInput as jest.Mock;
-
-            mockGetInput.mockReturnValue('localhost');
-            const serverName = mockGetInput('serverName', true);
-
-            expect(serverName).toBe('localhost');
-        });
-
-        it('should accept valid database name', () => {
-            const mockGetInput = tl.getInput as jest.Mock;
-
-            mockGetInput.mockReturnValue('MyDatabase');
-            const databaseName = mockGetInput('databaseName', true);
-
-            expect(databaseName).toBe('MyDatabase');
-        });
-    });
-
-    describe('Authentication Types', () => {
-        it('should support Windows Authentication', () => {
-            const mockGetInput = tl.getInput as jest.Mock;
-
-            mockGetInput.mockReturnValue('windowsAuthentication');
-            const authType = mockGetInput('authenticationType', true);
-
-            expect(authType).toBe('windowsAuthentication');
-        });
-
-        it('should support SQL Server Authentication', () => {
-            const mockGetInput = tl.getInput as jest.Mock;
-
-            mockGetInput.mockReturnValue('sqlServerAuthentication');
-            const authType = mockGetInput('authenticationType', true);
-
-            expect(authType).toBe('sqlServerAuthentication');
-        });
-
-        it('should support Azure Active Directory', () => {
-            const mockGetInput = tl.getInput as jest.Mock;
-
-            mockGetInput.mockReturnValue('azureActiveDirectory');
-            const authType = mockGetInput('authenticationType', true);
-
-            expect(authType).toBe('azureActiveDirectory');
-        });
-    });
-
-    describe('Connection Methods', () => {
-        it('should support server connection method', () => {
-            const mockGetInput = tl.getInput as jest.Mock;
-
+        it('should fail if dacpacFile is not provided', async () => {
+            mockGetPathInput.mockReturnValue('');
             mockGetInput.mockReturnValue('server');
-            const targetMethod = mockGetInput('targetMethod', true);
 
-            expect(targetMethod).toBe('server');
+            await run();
+
+            expect(mockSetResult).toHaveBeenCalledWith(
+                tl.TaskResult.Failed,
+                expect.stringContaining('DACPAC file path is required')
+            );
         });
 
-        it('should support connection string method', () => {
-            const mockGetInput = tl.getInput as jest.Mock;
+        it('should fail if dacpacFile does not exist', async () => {
+            mockGetPathInput.mockReturnValue('/path/to/missing.dacpac');
+            mockGetInput.mockReturnValue('server');
+            mockExistsSync.mockReturnValue(false);
 
-            mockGetInput.mockReturnValue('connectionString');
-            const targetMethod = mockGetInput('targetMethod', true);
+            await run();
 
-            expect(targetMethod).toBe('connectionString');
+            expect(mockSetResult).toHaveBeenCalledWith(
+                tl.TaskResult.Failed,
+                expect.stringContaining('DACPAC file not found')
+            );
+        });
+
+        it('should fail if SqlPackage is not available', async () => {
+            mockGetPathInput.mockReturnValueOnce('/path/to/test.dacpac');
+            mockGetInput.mockReturnValue('server');
+            mockExec.mockRejectedValueOnce(new Error('Command not found'));
+
+            await run();
+
+            expect(mockSetResult).toHaveBeenCalledWith(
+                tl.TaskResult.Failed,
+                expect.stringContaining('SqlPackage not found in PATH')
+            );
         });
     });
 
-    describe('File Path Operations', () => {
-        it('should handle dacpac file path', () => {
-            const mockGetPathInput = tl.getPathInput as jest.Mock;
-            const testPath = path.join(__dirname, 'test.dacpac');
+    describe('Windows Authentication', () => {
+        it('should build correct connection string for Windows Authentication', async () => {
+            mockGetPathInput.mockReturnValueOnce('/path/to/test.dacpac').mockReturnValueOnce(null);
+            mockGetInput
+                .mockReturnValueOnce('server') // targetMethod
+                .mockReturnValueOnce('') // additionalArguments
+                .mockReturnValueOnce('myserver') // serverName
+                .mockReturnValueOnce('mydb') // databaseName
+                .mockReturnValueOnce('windowsAuthentication'); // authenticationType
 
-            mockGetPathInput.mockReturnValue(testPath);
-            const dacpacFile = mockGetPathInput('dacpacFile', true, true);
+            mockExec.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
 
-            expect(dacpacFile).toBe(testPath);
+            await run();
+
+            expect(mockExec).toHaveBeenCalledWith('sqlpackage', expect.arrayContaining([
+                '/Action:Publish',
+                '/SourceFile:/path/to/test.dacpac',
+                expect.stringContaining('Integrated Security=True')
+            ]));
+        });
+    });
+
+    describe('SQL Server Authentication', () => {
+        it('should build correct connection string for SQL Authentication', async () => {
+            mockGetPathInput.mockReturnValueOnce('/path/to/test.dacpac').mockReturnValueOnce(null);
+            mockGetInput
+                .mockReturnValueOnce('server') // targetMethod
+                .mockReturnValueOnce('') // additionalArguments
+                .mockReturnValueOnce('myserver') // serverName
+                .mockReturnValueOnce('mydb') // databaseName
+                .mockReturnValueOnce('sqlServerAuthentication') // authenticationType
+                .mockReturnValueOnce('sa') // sqlUsername
+                .mockReturnValueOnce('password123'); // sqlPassword
+
+            mockExec.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
+
+            await run();
+
+            expect(mockExec).toHaveBeenCalledWith('sqlpackage', expect.arrayContaining([
+                '/Action:Publish',
+                expect.stringContaining('User Id=sa'),
+                expect.stringContaining('Password=password123')
+            ]));
         });
 
-        it('should handle publish profile path', () => {
-            const mockGetPathInput = tl.getPathInput as jest.Mock;
-            const testPath = path.join(__dirname, 'test.publish.xml');
+        it('should fail if SQL username is missing', async () => {
+            mockGetPathInput.mockReturnValueOnce('/path/to/test.dacpac');
+            mockGetInput
+                .mockReturnValueOnce('server')
+                .mockReturnValueOnce('')
+                .mockReturnValueOnce('myserver')
+                .mockReturnValueOnce('mydb')
+                .mockReturnValueOnce('sqlServerAuthentication')
+                .mockReturnValueOnce('') // empty username
+                .mockReturnValueOnce('password');
 
-            mockGetPathInput.mockReturnValue(testPath);
-            const profilePath = mockGetPathInput('publishProfile', false);
+            mockExec.mockResolvedValueOnce(0);
 
-            expect(profilePath).toBe(testPath);
+            await run();
+
+            expect(mockSetResult).toHaveBeenCalledWith(
+                tl.TaskResult.Failed,
+                expect.stringContaining('username and password are required')
+            );
+        });
+    });
+
+    describe('Azure Active Directory Authentication', () => {
+        it('should build correct connection string for Azure AD', async () => {
+            mockGetPathInput.mockReturnValueOnce('/path/to/test.dacpac').mockReturnValueOnce(null);
+            mockGetInput
+                .mockReturnValueOnce('server')
+                .mockReturnValueOnce('')
+                .mockReturnValueOnce('myserver.database.windows.net')
+                .mockReturnValueOnce('mydb')
+                .mockReturnValueOnce('azureActiveDirectory');
+
+            mockExec.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
+
+            await run();
+
+            expect(mockExec).toHaveBeenCalledWith('sqlpackage', expect.arrayContaining([
+                expect.stringContaining('Active Directory Integrated')
+            ]));
+        });
+    });
+
+    describe('Connection String Method', () => {
+        it('should use provided connection string', async () => {
+            mockGetPathInput.mockReturnValueOnce('/path/to/test.dacpac').mockReturnValueOnce(null);
+            mockGetInput
+                .mockReturnValueOnce('connectionString')
+                .mockReturnValueOnce('')
+                .mockReturnValueOnce('Server=myserver;Database=mydb;User Id=sa;Password=pwd;');
+
+            mockExec.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
+
+            await run();
+
+            expect(mockExec).toHaveBeenCalledWith('sqlpackage', expect.arrayContaining([
+                '/TargetConnectionString:Server=myserver;Database=mydb;User Id=sa;Password=pwd;'
+            ]));
+        });
+
+        it('should fail if connection string is empty', async () => {
+            mockGetPathInput.mockReturnValueOnce('/path/to/test.dacpac');
+            mockGetInput
+                .mockReturnValueOnce('connectionString')
+                .mockReturnValueOnce('')
+                .mockReturnValueOnce('');
+
+            mockExec.mockResolvedValueOnce(0);
+
+            await run();
+
+            expect(mockSetResult).toHaveBeenCalledWith(
+                tl.TaskResult.Failed,
+                expect.stringContaining('Connection string is required')
+            );
+        });
+    });
+
+    describe('Publish Profile', () => {
+        it('should include publish profile if file exists', async () => {
+            mockGetPathInput
+                .mockReturnValueOnce('/path/to/test.dacpac')
+                .mockReturnValueOnce('/path/to/profile.publish.xml');
+            mockGetInput.mockReturnValueOnce('server').mockReturnValueOnce('');
+            mockGetInput
+                .mockReturnValueOnce('myserver')
+                .mockReturnValueOnce('mydb')
+                .mockReturnValueOnce('windowsAuthentication');
+
+            mockExistsSync.mockReturnValue(true);
+            mockExec.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
+
+            await run();
+
+            expect(mockExec).toHaveBeenCalledWith('sqlpackage', expect.arrayContaining([
+                '/Profile:/path/to/profile.publish.xml'
+            ]));
+        });
+
+        it('should skip publish profile if file does not exist', async () => {
+            mockGetPathInput
+                .mockReturnValueOnce('/path/to/test.dacpac')
+                .mockReturnValueOnce('/path/to/missing.publish.xml');
+            mockGetInput.mockReturnValueOnce('server').mockReturnValueOnce('');
+            mockGetInput
+                .mockReturnValueOnce('myserver')
+                .mockReturnValueOnce('mydb')
+                .mockReturnValueOnce('windowsAuthentication');
+
+            mockExistsSync
+                .mockReturnValueOnce(true) // dacpac exists
+                .mockReturnValueOnce(false); // profile doesn't exist
+            mockExec.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
+
+            await run();
+
+            const execCalls = mockExec.mock.calls;
+            const sqlPackageCall = execCalls.find(call => call[0] === 'sqlpackage' && call[1].length > 1);
+            expect(sqlPackageCall?.[1]).not.toContain('/Profile:/path/to/missing.publish.xml');
         });
     });
 
     describe('Additional Arguments', () => {
-        it('should accept additional arguments', () => {
-            const mockGetInput = tl.getInput as jest.Mock;
+        it('should include single line additional arguments', async () => {
+            mockGetPathInput.mockReturnValueOnce('/path/to/test.dacpac').mockReturnValueOnce(null);
+            mockGetInput
+                .mockReturnValueOnce('server')
+                .mockReturnValueOnce('/p:BlockOnPossibleDataLoss=false')
+                .mockReturnValueOnce('myserver')
+                .mockReturnValueOnce('mydb')
+                .mockReturnValueOnce('windowsAuthentication');
 
-            mockGetInput.mockReturnValue('/p:BlockOnPossibleDataLoss=false');
-            const args = mockGetInput('additionalArguments', false);
+            mockExec.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
 
-            expect(args).toBe('/p:BlockOnPossibleDataLoss=false');
+            await run();
+
+            expect(mockExec).toHaveBeenCalledWith('sqlpackage', expect.arrayContaining([
+                '/p:BlockOnPossibleDataLoss=false'
+            ]));
         });
 
-        it('should handle multiline arguments', () => {
-            const mockGetInput = tl.getInput as jest.Mock;
-            const multilineArgs = '/p:BlockOnPossibleDataLoss=false\n/p:DropObjectsNotInSource=true';
+        it('should include multiline additional arguments', async () => {
+            mockGetPathInput.mockReturnValueOnce('/path/to/test.dacpac').mockReturnValueOnce(null);
+            mockGetInput
+                .mockReturnValueOnce('server')
+                .mockReturnValueOnce('/p:BlockOnPossibleDataLoss=false\n/p:DropObjectsNotInSource=true')
+                .mockReturnValueOnce('myserver')
+                .mockReturnValueOnce('mydb')
+                .mockReturnValueOnce('windowsAuthentication');
 
-            mockGetInput.mockReturnValue(multilineArgs);
-            const args = mockGetInput('additionalArguments', false);
+            mockExec.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
 
-            expect(args).toContain('BlockOnPossibleDataLoss');
-            expect(args).toContain('DropObjectsNotInSource');
-        });
-    });
+            await run();
 
-    describe('Task Result', () => {
-        it('should set success result on completion', () => {
-            const mockSetResult = tl.setResult as jest.Mock;
-
-            mockSetResult(tl.TaskResult.Succeeded, 'Deployment completed');
-
-            expect(mockSetResult).toHaveBeenCalledWith(
-                tl.TaskResult.Succeeded,
-                'Deployment completed'
-            );
+            expect(mockExec).toHaveBeenCalledWith('sqlpackage', expect.arrayContaining([
+                '/p:BlockOnPossibleDataLoss=false',
+                '/p:DropObjectsNotInSource=true'
+            ]));
         });
 
-        it('should set failed result on error', () => {
-            const mockSetResult = tl.setResult as jest.Mock;
+        it('should filter out empty lines in additional arguments', async () => {
+            mockGetPathInput.mockReturnValueOnce('/path/to/test.dacpac').mockReturnValueOnce(null);
+            mockGetInput
+                .mockReturnValueOnce('server')
+                .mockReturnValueOnce('/p:BlockOnPossibleDataLoss=false\n\n/p:DropObjectsNotInSource=true\n  ')
+                .mockReturnValueOnce('myserver')
+                .mockReturnValueOnce('mydb')
+                .mockReturnValueOnce('windowsAuthentication');
 
-            mockSetResult(tl.TaskResult.Failed, 'Deployment failed');
+            mockExec.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
 
-            expect(mockSetResult).toHaveBeenCalledWith(
-                tl.TaskResult.Failed,
-                'Deployment failed'
-            );
-        });
-    });
+            await run();
 
-    describe('Platform Detection', () => {
-        it('should detect Windows platform', () => {
-            const isWindows = process.platform === 'win32';
-            expect(typeof isWindows).toBe('boolean');
-        });
+            const execCalls = mockExec.mock.calls;
+            const sqlPackageCall = execCalls.find(call => call[0] === 'sqlpackage' && call[1].length > 1);
+            const args = sqlPackageCall?.[1] || [];
 
-        it('should use correct SqlPackage executable', () => {
-            const sqlPackageCmd = process.platform === 'win32' ? 'sqlpackage.exe' : 'sqlpackage';
-            expect(sqlPackageCmd).toMatch(/sqlpackage/);
+            expect(args).toContain('/p:BlockOnPossibleDataLoss=false');
+            expect(args).toContain('/p:DropObjectsNotInSource=true');
+            expect(args.filter((arg: string) => arg.trim() === '')).toHaveLength(0);
         });
     });
 
     describe('Command Execution', () => {
-        it('should construct publish command', () => {
-            const args = [
-                '/Action:Publish',
-                '/SourceFile:test.dacpac',
-                '/TargetConnectionString:Server=localhost;Database=MyDb;'
-            ];
+        it('should execute sqlpackage with correct arguments', async () => {
+            mockGetPathInput.mockReturnValueOnce('/path/to/test.dacpac').mockReturnValueOnce(null);
+            mockGetInput
+                .mockReturnValueOnce('server')
+                .mockReturnValueOnce('')
+                .mockReturnValueOnce('myserver')
+                .mockReturnValueOnce('mydb')
+                .mockReturnValueOnce('windowsAuthentication');
 
-            expect(args).toContain('/Action:Publish');
-            expect(args).toContain('/SourceFile:test.dacpac');
+            mockExec.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
+
+            await run();
+
+            expect(mockExec).toHaveBeenCalledWith('sqlpackage', expect.arrayContaining([
+                '/Action:Publish',
+                '/SourceFile:/path/to/test.dacpac',
+                expect.stringContaining('/TargetConnectionString:')
+            ]));
         });
 
-        it('should include publish profile if specified', () => {
-            const profilePath = 'test.publish.xml';
-            const args = [`/Profile:${profilePath}`];
+        it('should succeed when sqlpackage returns 0', async () => {
+            mockGetPathInput.mockReturnValueOnce('/path/to/test.dacpac').mockReturnValueOnce(null);
+            mockGetInput
+                .mockReturnValueOnce('server')
+                .mockReturnValueOnce('')
+                .mockReturnValueOnce('myserver')
+                .mockReturnValueOnce('mydb')
+                .mockReturnValueOnce('windowsAuthentication');
 
-            expect(args[0]).toContain('/Profile:');
+            mockExec.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
+
+            await run();
+
+            expect(mockSetResult).toHaveBeenCalledWith(
+                tl.TaskResult.Succeeded,
+                'Database deployment completed successfully'
+            );
+        });
+
+        it('should fail when sqlpackage returns non-zero', async () => {
+            mockGetPathInput.mockReturnValueOnce('/path/to/test.dacpac').mockReturnValueOnce(null);
+            mockGetInput
+                .mockReturnValueOnce('server')
+                .mockReturnValueOnce('')
+                .mockReturnValueOnce('myserver')
+                .mockReturnValueOnce('mydb')
+                .mockReturnValueOnce('windowsAuthentication');
+
+            mockExec.mockResolvedValueOnce(0).mockResolvedValueOnce(1);
+
+            await run();
+
+            expect(mockSetResult).toHaveBeenCalledWith(
+                tl.TaskResult.Failed,
+                expect.stringContaining('SqlPackage exited with code 1')
+            );
+        });
+    });
+
+    describe('Error Handling', () => {
+        it('should handle missing server name', async () => {
+            mockGetPathInput.mockReturnValueOnce('/path/to/test.dacpac').mockReturnValueOnce(null);
+            mockGetInput
+                .mockReturnValueOnce('server')
+                .mockReturnValueOnce('')
+                .mockReturnValueOnce('') // empty server
+                .mockReturnValueOnce('mydb');
+
+            mockExec.mockResolvedValueOnce(0);
+
+            await run();
+
+            expect(mockSetResult).toHaveBeenCalledWith(
+                tl.TaskResult.Failed,
+                expect.stringContaining('Server name and database name are required')
+            );
+        });
+
+        it('should handle missing database name', async () => {
+            mockGetPathInput.mockReturnValueOnce('/path/to/test.dacpac').mockReturnValueOnce(null);
+            mockGetInput
+                .mockReturnValueOnce('server')
+                .mockReturnValueOnce('')
+                .mockReturnValueOnce('myserver')
+                .mockReturnValueOnce(''); // empty database
+
+            mockExec.mockResolvedValueOnce(0);
+
+            await run();
+
+            expect(mockSetResult).toHaveBeenCalledWith(
+                tl.TaskResult.Failed,
+                expect.stringContaining('Server name and database name are required')
+            );
+        });
+
+        it('should handle errors gracefully', async () => {
+            mockGetPathInput.mockReturnValueOnce('/path/to/test.dacpac');
+            mockGetInput.mockReturnValueOnce('server');
+            mockExec.mockRejectedValueOnce(new Error('Unexpected error'));
+
+            await run();
+
+            expect(mockSetResult).toHaveBeenCalledWith(
+                tl.TaskResult.Failed,
+                expect.any(String)
+            );
+            expect(consoleErrorSpy).toHaveBeenCalled();
+        });
+    });
+
+    describe('SqlPackage Command Construction', () => {
+        it('should always include /Action:Publish', async () => {
+            mockGetPathInput.mockReturnValueOnce('/path/to/test.dacpac').mockReturnValueOnce(null);
+            mockGetInput
+                .mockReturnValueOnce('server')
+                .mockReturnValueOnce('')
+                .mockReturnValueOnce('myserver')
+                .mockReturnValueOnce('mydb')
+                .mockReturnValueOnce('windowsAuthentication');
+
+            mockExec.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
+
+            await run();
+
+            const execCalls = mockExec.mock.calls;
+            const sqlPackageCall = execCalls.find(call => call[0] === 'sqlpackage' && call[1].length > 1);
+            expect(sqlPackageCall?.[1]).toContain('/Action:Publish');
+        });
+
+        it('should include /SourceFile with dacpac path', async () => {
+            mockGetPathInput.mockReturnValueOnce('/my/dacpac/file.dacpac').mockReturnValueOnce(null);
+            mockGetInput
+                .mockReturnValueOnce('server')
+                .mockReturnValueOnce('')
+                .mockReturnValueOnce('myserver')
+                .mockReturnValueOnce('mydb')
+                .mockReturnValueOnce('windowsAuthentication');
+
+            mockExec.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
+
+            await run();
+
+            expect(mockExec).toHaveBeenCalledWith('sqlpackage', expect.arrayContaining([
+                '/SourceFile:/my/dacpac/file.dacpac'
+            ]));
         });
     });
 });
+
+

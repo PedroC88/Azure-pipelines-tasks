@@ -33,12 +33,12 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.run = run;
 const tl = __importStar(require("azure-pipelines-task-lib/task"));
 const fs = __importStar(require("fs"));
 async function run() {
     try {
         // Get inputs
-        const deployMethod = tl.getInput('deployMethod', true) || 'DacpacFile';
         const dacpacFile = tl.getPathInput('dacpacFile', true, true);
         const targetMethod = tl.getInput('targetMethod', true) || 'server';
         const publishProfile = tl.getPathInput('publishProfile', false);
@@ -51,11 +51,10 @@ async function run() {
         }
         console.log(`Deploying DACPAC: ${dacpacFile}`);
         // Check if SqlPackage is available
-        const sqlPackageCmd = process.platform === 'win32' ? 'sqlpackage.exe' : 'sqlpackage';
         try {
             await tl.exec('sqlpackage', ['/version']);
         }
-        catch (err) {
+        catch (_a) {
             throw new Error('SqlPackage not found in PATH. Please run the SqlPackage Installer task first.');
         }
         // Build SqlPackage arguments
@@ -120,9 +119,13 @@ async function run() {
         }
     }
     catch (err) {
-        console.error(`Error: ${err.message}`);
-        tl.setResult(tl.TaskResult.Failed, err.message);
+        const error = err;
+        console.error(`Error: ${error.message}`);
+        tl.setResult(tl.TaskResult.Failed, error.message);
     }
 }
-run();
+// Only run if not in test mode
+if (process.env.NODE_ENV !== 'test') {
+    run();
+}
 //# sourceMappingURL=index.js.map

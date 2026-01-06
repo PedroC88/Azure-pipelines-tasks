@@ -1,11 +1,9 @@
 import * as tl from 'azure-pipelines-task-lib/task';
-import * as path from 'path';
 import * as fs from 'fs';
 
-async function run() {
+export async function run() {
     try {
         // Get inputs
-        const deployMethod = tl.getInput('deployMethod', true) || 'DacpacFile';
         const dacpacFile = tl.getPathInput('dacpacFile', true, true);
         const targetMethod = tl.getInput('targetMethod', true) || 'server';
         const publishProfile = tl.getPathInput('publishProfile', false);
@@ -22,11 +20,9 @@ async function run() {
         console.log(`Deploying DACPAC: ${dacpacFile}`);
 
         // Check if SqlPackage is available
-        const sqlPackageCmd = process.platform === 'win32' ? 'sqlpackage.exe' : 'sqlpackage';
-
         try {
             await tl.exec('sqlpackage', ['/version']);
-        } catch (err) {
+        } catch {
             throw new Error('SqlPackage not found in PATH. Please run the SqlPackage Installer task first.');
         }
 
@@ -104,10 +100,14 @@ async function run() {
             throw new Error(`SqlPackage exited with code ${result}`);
         }
 
-    } catch (err: any) {
-        console.error(`Error: ${err.message}`);
-        tl.setResult(tl.TaskResult.Failed, err.message);
+    } catch (err) {
+        const error = err as Error;
+        console.error(`Error: ${error.message}`);
+        tl.setResult(tl.TaskResult.Failed, error.message);
     }
 }
 
-run();
+// Only run if not in test mode
+if (process.env.NODE_ENV !== 'test') {
+    run();
+}
