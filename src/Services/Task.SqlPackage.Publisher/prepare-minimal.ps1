@@ -62,13 +62,4 @@ if (Test-Path "package.json") {
     Copy-Item "package.json" "SqlPackagePublisher\" -Force
 }
 
-# Copy overview and icon files for VSIX package
-Write-Host "Copying overview and icon files..."
-if (Test-Path "overview.md") {
-    Copy-Item "overview.md" "." -Force
-}
-if (Test-Path "icon.png") {
-    Copy-Item "icon.png" "." -Force
-}
-
 Write-Host "Minimal node_modules prepared successfully."
