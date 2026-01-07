@@ -24,12 +24,13 @@ For clarity:
 - As a rule of thumb, if a project directly or indirectly supports revenue-generating, fee-based, or production business activities, use of the Software for that project is considered commercial use.
 
 ### 3. Attribution Requirement
-All copies or substantial portions of the Software must include:
+Any and all copies of the Software, partial or complete, must include:
 - This license notice
+- The original license itself
 - Copyright notice identifying [PedroC88](https://github.com/PedroC88) as the original author
 - A link to the original source repository: https://github.com/PedroC88/Azure-pipelines-tasks
 
-### 4. Open Source Requirement
+### 4. Open-Source Requirement
 Any distribution or modification of the Software must remain open source. You may not distribute the Software or derivative works under a closed-source or proprietary license (other than this license), unless explicitly authorized in writing by the original author ([PedroC88](https://github.com/PedroC88)).
 
 ### 5. No Transfer of Ownership
