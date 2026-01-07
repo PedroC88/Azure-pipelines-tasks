@@ -2,6 +2,10 @@
 
 Install SqlPackage command-line utility in your Azure DevOps pipeline with this simple task. Works on Windows, Linux, and macOS agents.
 
+Installing this extension **DOES NOT** make SqlPackage available for the Microsoft SQL Deployment task because that task is hardcoded to search for the binaries on the Windows Registry, which requires system-wide changes outside of the scope (and conflicting with the purpose) of this task.
+
+This task is intended to be used with the [SqlPackage Publisher](https://marketplace.visualstudio.com/items?itemName=pedroc88.sqlpackage-publisher) companion task, or on systems with SqlPackage pre-installed and available on PATH.
+
 ## 🚀 Quick Start
 
 ```yaml

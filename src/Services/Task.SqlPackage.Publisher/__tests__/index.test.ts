@@ -3,7 +3,7 @@ process.env.NODE_ENV = 'test';
 
 import * as tl from 'azure-pipelines-task-lib/task';
 import * as fs from 'fs';
-import { run } from '../index';
+import { run, parseAdditionalArguments } from '../index';
 
 // Mock modules
 jest.mock('azure-pipelines-task-lib/task');
@@ -457,6 +457,98 @@ describe('SqlPackage Publisher Tests', () => {
             ]));
         });
     });
-});
 
+    describe('Additional Arguments Parsing', () => {
+        it('should parse space-separated arguments', () => {
+            const input = '/p:Arg1=Value1 /p:Arg2=Value2 /p:Arg3=Value3';
+            const result = parseAdditionalArguments(input);
+            expect(result).toEqual(['/p:Arg1=Value1', '/p:Arg2=Value2', '/p:Arg3=Value3']);
+        });
+
+        it('should parse arguments with quoted values', () => {
+            const input = '/v:Var1="Value with spaces" /v:Var2=Simple';
+            const result = parseAdditionalArguments(input);
+            expect(result).toEqual(['/v:Var1="Value with spaces"', '/v:Var2=Simple']);
+        });
+
+        it('should handle escaped quotes in values', () => {
+            const input = '/v:Var="Value with \\"escaped\\" quotes"';
+            const result = parseAdditionalArguments(input);
+            expect(result).toEqual(['/v:Var="Value with "escaped" quotes"']);
+        });
+
+        it('should parse newline-separated arguments', () => {
+            const input = '/p:Arg1=Value1\n/p:Arg2=Value2\n/p:Arg3=Value3';
+            const result = parseAdditionalArguments(input);
+            expect(result).toEqual(['/p:Arg1=Value1', '/p:Arg2=Value2', '/p:Arg3=Value3']);
+        });
+
+        it('should parse mixed space and newline-separated arguments', () => {
+            const input = '/p:Arg1=Value1 /p:Arg2=Value2\n/p:Arg3=Value3 /p:Arg4=Value4';
+            const result = parseAdditionalArguments(input);
+            expect(result).toEqual(['/p:Arg1=Value1', '/p:Arg2=Value2', '/p:Arg3=Value3', '/p:Arg4=Value4']);
+        });
+
+        it('should handle complex real-world example', () => {
+            const input = '/tec:Optional /p:DropObjectsNotInSource=false /p:ScriptDatabaseOptions=false /v:ServiceAccount=DOMAIN\\User /v:Group="Security Group" /v:Offshore="Offshore Group"';
+            const result = parseAdditionalArguments(input);
+            expect(result).toEqual([
+                '/tec:Optional',
+                '/p:DropObjectsNotInSource=false',
+                '/p:ScriptDatabaseOptions=false',
+                '/v:ServiceAccount=DOMAIN\\User',
+                '/v:Group="Security Group"',
+                '/v:Offshore="Offshore Group"'
+            ]);
+        });
+
+        it('should handle empty input', () => {
+            const input = '';
+            const result = parseAdditionalArguments(input);
+            expect(result).toEqual([]);
+        });
+
+        it('should handle whitespace-only input', () => {
+            const input = '   \n  \n  ';
+            const result = parseAdditionalArguments(input);
+            expect(result).toEqual([]);
+        });
+
+        it('should preserve spaces within quoted values', () => {
+            const input = '/v:Var="Value  with   multiple   spaces"';
+            const result = parseAdditionalArguments(input);
+            expect(result).toEqual(['/v:Var="Value  with   multiple   spaces"']);
+        });
+
+        it('should handle arguments with equals signs in quoted values', () => {
+            const input = '/v:ConnectionString="Server=localhost;Database=Test"';
+            const result = parseAdditionalArguments(input);
+            expect(result).toEqual(['/v:ConnectionString="Server=localhost;Database=Test"']);
+        });
+
+        it('should handle multiple consecutive spaces between arguments', () => {
+            const input = '/p:Arg1=Value1    /p:Arg2=Value2';
+            const result = parseAdditionalArguments(input);
+            expect(result).toEqual(['/p:Arg1=Value1', '/p:Arg2=Value2']);
+        });
+
+        it('should handle single argument', () => {
+            const input = '/p:SingleArg=Value';
+            const result = parseAdditionalArguments(input);
+            expect(result).toEqual(['/p:SingleArg=Value']);
+        });
+
+        it('should handle argument with backslash in path', () => {
+            const input = '/SourceFile:C:\\Path\\To\\File.dacpac';
+            const result = parseAdditionalArguments(input);
+            expect(result).toEqual(['/SourceFile:C:\\Path\\To\\File.dacpac']);
+        });
+
+        it('should handle Azure DevOps variable syntax', () => {
+            const input = '/v:ServiceAccount=$(executionAccount) /v:Group="$(securityGroup)"';
+            const result = parseAdditionalArguments(input);
+            expect(result).toEqual(['/v:ServiceAccount=$(executionAccount)', '/v:Group="$(securityGroup)"']);
+        });
+    });
+});
 

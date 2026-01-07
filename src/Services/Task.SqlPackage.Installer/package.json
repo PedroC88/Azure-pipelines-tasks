@@ -1,6 +1,6 @@
 {
   "name": "sqlpackage-installer",
-  "version": "1.0.34",
+  "version": "1.0.35",
   "description": "Installs a specific version of SqlPackage from the internet or the tools cache and adds it to the PATH. Use this task to change the version of SqlPackage used in subsequent tasks.",
   "main": "index.js",
   "scripts": {
