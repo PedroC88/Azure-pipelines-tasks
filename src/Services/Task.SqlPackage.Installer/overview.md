@@ -32,7 +32,7 @@ Then use SqlPackage in your pipeline:
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `versionSpec` | Version to install (e.g., 'latest', '162.0.52.1') | `latest` |
+| `versionSpec` | Version to install (e.g., 'latest', '170.2.70') | `latest` |
 | `checkLatest` | Always check for latest version | `false` |
 | `installDirectory` | Custom installation directory | Tool cache |
 
@@ -51,7 +51,7 @@ Then use SqlPackage in your pipeline:
 ```yaml
 - task: SqlPackageInstaller@1
   inputs:
-    versionSpec: '162.0.52.1'
+    versionSpec: '170.2.70'
 ```
 
 ### Always Use Latest (Skip Cache)
