@@ -2,6 +2,10 @@
 
 Deploy SQL Server DACPAC files using SqlPackage command-line utility. Cross-platform support for Windows, Linux, and macOS agents.
 
+## 📄 License
+
+Custom non-commercial license - free for personal use. See [LICENSE](https://github.com/PedroC88/Azure-pipelines-tasks/blob/develop/LICENSE) for details.
+
 ## 🚀 Quick Start
 
 ```yaml
@@ -202,10 +206,6 @@ variables:
 - [Report Issues](https://github.com/PedroC88/Azure-pipelines-tasks/issues)
 - [SqlPackage Documentation](https://docs.microsoft.com/sql/tools/sqlpackage)
 - [SqlPackage Publish Parameters](https://docs.microsoft.com/sql/tools/sqlpackage/sqlpackage-publish)
-
-## 📄 License
-
-Custom non-commercial license - free for personal use. See [LICENSE](https://github.com/PedroC88/Azure-pipelines-tasks/blob/develop/LICENSE) for details.
 
 ---
 
