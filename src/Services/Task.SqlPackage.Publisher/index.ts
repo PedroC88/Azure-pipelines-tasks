@@ -1,11 +1,10 @@
 import * as tl from 'azure-pipelines-task-lib/task';
 import * as fs from 'fs';
 
-function parseAdditionalArguments(input: string): string[] {
+export function parseAdditionalArguments(input: string): string[] {
     const args: string[] = [];
     let current = '';
     let inQuotes = false;
-    let escapeNext = false;
 
     // Normalize line endings and split into lines
     const lines = input.split(/\r?\n/);
@@ -16,26 +15,25 @@ function parseAdditionalArguments(input: string): string[] {
     for (let i = 0; i < normalized.length; i++) {
         const char = normalized[i];
 
-        if (escapeNext) {
-            current += char;
-            escapeNext = false;
-            continue;
-        }
-
+        // Handle escaped quotes
         if (char === '\\' && i + 1 < normalized.length && normalized[i + 1] === '"') {
-            escapeNext = true;
+            // Add the quote to current without toggling inQuotes state
+            current += '"';
+            i++; // Skip the next character (the quote)
             continue;
         }
 
+        // Handle quote delimiters
         if (char === '"') {
             inQuotes = !inQuotes;
             current += char;
             continue;
         }
 
+        // Handle spaces (argument separators when not in quotes)
         if (char === ' ' && !inQuotes) {
-            if (current.trim()) {
-                args.push(current.trim());
+            if (current.length > 0) {
+                args.push(current);
                 current = '';
             }
             continue;
@@ -45,8 +43,8 @@ function parseAdditionalArguments(input: string): string[] {
     }
 
     // Add final argument if exists
-    if (current.trim()) {
-        args.push(current.trim());
+    if (current.length > 0) {
+        args.push(current);
     }
 
     return args;
