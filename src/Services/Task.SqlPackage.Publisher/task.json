@@ -9,9 +9,9 @@
   "author": "PedroC88",
   "icon": "icon.png",
   "version": {
-    "Major": 0,
+    "Major": 1,
     "Minor": 0,
-    "Patch": 13
+    "Patch": 0
   },
   "instanceNameFormat": "Deploy $(dacpacFile) to $(databaseName)",
   "inputs": [
