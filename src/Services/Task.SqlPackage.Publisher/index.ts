@@ -98,7 +98,6 @@ export async function run() {
             // This allows additional target parameters to be used without conflicts
             args.push(`/TargetServerName:${serverName}`);
             args.push(`/TargetDatabaseName:${databaseName}`);
-            args.push('/TargetTrustServerCertificate:True');
 
             if (authenticationType === 'windowsAuthentication') {
                 // Integrated security doesn't need username/password

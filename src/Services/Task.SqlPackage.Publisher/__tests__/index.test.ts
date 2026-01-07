@@ -126,7 +126,6 @@ describe('SqlPackage Publisher Tests', () => {
                 '/SourceFile:/path/to/test.dacpac',
                 '/TargetServerName:myserver',
                 '/TargetDatabaseName:mydb',
-                '/TargetTrustServerCertificate:True',
                 '/TargetUser:sa',
                 '/TargetPassword:password123'
             ]));
@@ -173,7 +172,6 @@ describe('SqlPackage Publisher Tests', () => {
                 '/SourceFile:/path/to/test.dacpac',
                 '/TargetServerName:myserver.database.windows.net',
                 '/TargetDatabaseName:mydb',
-                '/TargetTrustServerCertificate:True',
                 '/TargetAuthenticationType:ActiveDirectoryIntegrated'
             ]));
         });
@@ -337,8 +335,7 @@ describe('SqlPackage Publisher Tests', () => {
                 '/Action:Publish',
                 '/SourceFile:/path/to/test.dacpac',
                 '/TargetServerName:myserver',
-                '/TargetDatabaseName:mydb',
-                '/TargetTrustServerCertificate:True'
+                '/TargetDatabaseName:mydb'
             ]));
         });
 
