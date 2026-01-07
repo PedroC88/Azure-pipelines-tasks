@@ -99,8 +99,7 @@ describe('SqlPackage Publisher Tests', () => {
                 '/Action:Publish',
                 '/SourceFile:/path/to/test.dacpac',
                 '/TargetServerName:myserver',
-                '/TargetDatabaseName:mydb',
-                '/TargetTrustServerCertificate:True'
+                '/TargetDatabaseName:mydb'
             ]));
         });
     });
