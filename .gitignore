@@ -159,3 +159,43 @@ lerna-debug.log*
 # Azure DevOps task key files
 .taskkey
 **/.taskkey
+
+# Build outputs for tasks
+src/Services/**/lib/
+src/Services/**/*.js
+src/Services/**/*.js.map
+src/Services/**/*.d.ts
+src/Services/**/*.d.ts.map
+# Exceptions for config files
+!src/Services/**/fs.realpath.js
+!src/Services/**/eslint.config.js
+!src/Services/**/jest.config.js
+
+# Task build directories
+src/Services/**/SqlPackageInstaller/
+src/Services/**/SqlPackagePublisher/
+
+# Node modules variants for packaging
+src/Services/**/node_modules_minimal/
+src/Services/**/node_modules_temp/
+src/Services/**/node_modules_full/
+
+# Testing artifacts
+src/Services/**/tools/
+src/Services/**/temp/
+src/Services/**/custom-sqlpackage/
+src/Services/**/test-results/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE specific settings
+.vscode/settings.json
+.vscode/launch.json
+.idea/

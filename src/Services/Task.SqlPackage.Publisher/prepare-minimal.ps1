@@ -58,6 +58,7 @@ Copy-Item "node_modules_minimal" "SqlPackagePublisher\node_modules" -Recurse
 Write-Host "Copying compiled task files to SqlPackagePublisher directory..."
 Copy-Item "index.js" "SqlPackagePublisher\" -Force
 Copy-Item "task.json" "SqlPackagePublisher\" -Force
+Copy-Item "icon.png" "SqlPackagePublisher\" -Force
 if (Test-Path "package.json") {
     Copy-Item "package.json" "SqlPackagePublisher\" -Force
 }
