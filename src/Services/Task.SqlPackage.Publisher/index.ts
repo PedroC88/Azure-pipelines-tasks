@@ -1,6 +1,57 @@
 import * as tl from 'azure-pipelines-task-lib/task';
 import * as fs from 'fs';
 
+function parseAdditionalArguments(input: string): string[] {
+    const args: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    let escapeNext = false;
+
+    // Normalize line endings and split into lines
+    const lines = input.split(/\r?\n/);
+
+    // Join all lines with spaces, but preserve intentional newlines as boundaries
+    const normalized = lines.map(line => line.trim()).filter(line => line).join(' ');
+
+    for (let i = 0; i < normalized.length; i++) {
+        const char = normalized[i];
+
+        if (escapeNext) {
+            current += char;
+            escapeNext = false;
+            continue;
+        }
+
+        if (char === '\\' && i + 1 < normalized.length && normalized[i + 1] === '"') {
+            escapeNext = true;
+            continue;
+        }
+
+        if (char === '"') {
+            inQuotes = !inQuotes;
+            current += char;
+            continue;
+        }
+
+        if (char === ' ' && !inQuotes) {
+            if (current.trim()) {
+                args.push(current.trim());
+                current = '';
+            }
+            continue;
+        }
+
+        current += char;
+    }
+
+    // Add final argument if exists
+    if (current.trim()) {
+        args.push(current.trim());
+    }
+
+    return args;
+}
+
 export async function run() {
     try {
         // Get inputs
@@ -83,7 +134,9 @@ export async function run() {
 
         // Additional arguments
         if (additionalArguments) {
-            const additionalArgs = additionalArguments.split(/\r?\n/).filter(arg => arg.trim());
+            // Parse additional arguments - handle both space-separated and newline-separated
+            // Need to handle quoted values properly (e.g., /v:Var="Value with spaces")
+            const additionalArgs = parseAdditionalArguments(additionalArguments);
             args.push(...additionalArgs);
         }
 
