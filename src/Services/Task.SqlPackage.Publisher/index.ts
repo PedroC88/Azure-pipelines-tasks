@@ -94,11 +94,15 @@ export async function run() {
                 throw new Error('Server name and database name are required');
             }
 
-            // Build connection string based on authentication type
-            let connectionString = '';
+            // Use individual target parameters instead of connection string
+            // This allows additional target parameters to be used without conflicts
+            args.push(`/TargetServerName:${serverName}`);
+            args.push(`/TargetDatabaseName:${databaseName}`);
+            args.push('/TargetTrustServerCertificate:True');
 
             if (authenticationType === 'windowsAuthentication') {
-                connectionString = `Server=${serverName};Database=${databaseName};Integrated Security=True;TrustServerCertificate=True;`;
+                // Integrated security doesn't need username/password
+                // SqlPackage will use Windows authentication by default when no credentials provided
             } else if (authenticationType === 'sqlServerAuthentication') {
                 const sqlUsername = tl.getInput('sqlUsername', true);
                 const sqlPassword = tl.getInput('sqlPassword', true);
@@ -107,12 +111,12 @@ export async function run() {
                     throw new Error('SQL username and password are required for SQL Server authentication');
                 }
 
-                connectionString = `Server=${serverName};Database=${databaseName};User Id=${sqlUsername};Password=${sqlPassword};TrustServerCertificate=True;`;
+                args.push(`/TargetUser:${sqlUsername}`);
+                args.push(`/TargetPassword:${sqlPassword}`);
             } else if (authenticationType === 'azureActiveDirectory') {
-                connectionString = `Server=${serverName};Database=${databaseName};Authentication=Active Directory Integrated;TrustServerCertificate=True;`;
+                // Azure AD authentication
+                args.push('/TargetAuthenticationType:ActiveDirectoryIntegrated');
             }
-
-            args.push(`/TargetConnectionString:${connectionString}`);
 
         } else if (targetMethod === 'connectionString') {
             const connectionString = tl.getInput('connectionString', true);

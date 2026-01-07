@@ -98,7 +98,9 @@ describe('SqlPackage Publisher Tests', () => {
             expect(mockExec).toHaveBeenCalledWith('sqlpackage', expect.arrayContaining([
                 '/Action:Publish',
                 '/SourceFile:/path/to/test.dacpac',
-                expect.stringContaining('Integrated Security=True')
+                '/TargetServerName:myserver',
+                '/TargetDatabaseName:mydb',
+                '/TargetTrustServerCertificate:True'
             ]));
         });
     });
@@ -121,8 +123,12 @@ describe('SqlPackage Publisher Tests', () => {
 
             expect(mockExec).toHaveBeenCalledWith('sqlpackage', expect.arrayContaining([
                 '/Action:Publish',
-                expect.stringContaining('User Id=sa'),
-                expect.stringContaining('Password=password123')
+                '/SourceFile:/path/to/test.dacpac',
+                '/TargetServerName:myserver',
+                '/TargetDatabaseName:mydb',
+                '/TargetTrustServerCertificate:True',
+                '/TargetUser:sa',
+                '/TargetPassword:password123'
             ]));
         });
 
@@ -163,7 +169,12 @@ describe('SqlPackage Publisher Tests', () => {
             await run();
 
             expect(mockExec).toHaveBeenCalledWith('sqlpackage', expect.arrayContaining([
-                expect.stringContaining('Active Directory Integrated')
+                '/Action:Publish',
+                '/SourceFile:/path/to/test.dacpac',
+                '/TargetServerName:myserver.database.windows.net',
+                '/TargetDatabaseName:mydb',
+                '/TargetTrustServerCertificate:True',
+                '/TargetAuthenticationType:ActiveDirectoryIntegrated'
             ]));
         });
     });
@@ -325,7 +336,9 @@ describe('SqlPackage Publisher Tests', () => {
             expect(mockExec).toHaveBeenCalledWith('sqlpackage', expect.arrayContaining([
                 '/Action:Publish',
                 '/SourceFile:/path/to/test.dacpac',
-                expect.stringContaining('/TargetConnectionString:')
+                '/TargetServerName:myserver',
+                '/TargetDatabaseName:mydb',
+                '/TargetTrustServerCertificate:True'
             ]));
         });
 
