@@ -127,8 +127,8 @@ export async function run() {
             args.push(`/TargetConnectionString:${connectionString}`);
         }
 
-        // Publish profile
-        if (publishProfile && fs.existsSync(publishProfile)) {
+        // Publish profile - only add if explicitly provided
+        if (publishProfile && publishProfile.trim() !== '' && fs.existsSync(publishProfile)) {
             console.log(`Using publish profile: ${publishProfile}`);
             args.push(`/Profile:${publishProfile}`);
         }

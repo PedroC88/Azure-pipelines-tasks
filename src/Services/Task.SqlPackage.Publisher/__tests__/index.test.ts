@@ -253,6 +253,27 @@ describe('SqlPackage Publisher Tests', () => {
             const sqlPackageCall = execCalls.find(call => call[0] === 'sqlpackage' && call[1].length > 1);
             expect(sqlPackageCall?.[1]).not.toContain('/Profile:/path/to/missing.publish.xml');
         });
+
+        it('should skip publish profile if none is provided', async () => {
+            mockGetPathInput
+                .mockReturnValueOnce('/path/to/test.dacpac')
+                .mockReturnValueOnce(null); // no profile provided
+            mockGetInput.mockReturnValueOnce('server').mockReturnValueOnce('');
+            mockGetInput
+                .mockReturnValueOnce('myserver')
+                .mockReturnValueOnce('mydb')
+                .mockReturnValueOnce('windowsAuthentication');
+
+            mockExistsSync.mockReturnValueOnce(true); // dacpac exists
+            mockExec.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
+
+            await run();
+
+            const execCalls = mockExec.mock.calls;
+            const sqlPackageCall = execCalls.find(call => call[0] === 'sqlpackage' && call[1].length > 1);
+            const profileArg = sqlPackageCall?.[1].find((arg: string) => arg.startsWith('/Profile:'));
+            expect(profileArg).toBeUndefined();
+        });
     });
 
     describe('Additional Arguments', () => {
