@@ -4,7 +4,7 @@ Copyright (c) 2026 [PedroC88](https://github.com/PedroC88)
 
 ## Grant of License
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to use, copy, modify, and distribute the Software for **non-commercial purposes only**, subject to the following conditions:
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software, its source code and/or documentation files (the "Software"), to use, copy, modify, and distribute the Software for **non-commercial purposes only**, subject to the following conditions:
 
 ## Terms and Conditions
 
@@ -16,7 +16,6 @@ The Software may be used, copied, modified, and distributed for personal, educat
 - Use of the Software in pipelines, workflows, or processes that support commercial, business, or production operations
 - Use of the Software to build, deploy, or maintain commercial products or paid services
 - Use of the Software to provide paid services to third parties
-
 
 For clarity:
 - Use of the Software within any Azure DevOps organization or account (or similar platform) that is owned, controlled, or paid for by a company, government entity, or other commercial/organizational user, in connection with that entity's projects, products, services, or internal operations, **IS** considered commercial use and requires a commercial license, even if the individual user is not personally paid for that use.

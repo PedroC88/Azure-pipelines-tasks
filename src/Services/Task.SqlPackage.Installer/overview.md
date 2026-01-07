@@ -6,6 +6,10 @@ Installing this extension **DOES NOT** make SqlPackage available for the Microso
 
 This task is intended to be used with the [SqlPackage Publisher](https://marketplace.visualstudio.com/items?itemName=pedroc88.sqlpackage-publisher) companion task, or on systems with SqlPackage pre-installed and available on PATH.
 
+## 📄 License
+
+Custom non-commercial license - free for personal use. See [LICENSE](https://github.com/PedroC88/Azure-pipelines-tasks/blob/develop/LICENSE) for details.
+
 ## 🚀 Quick Start
 
 ```yaml
@@ -126,10 +130,6 @@ variables:
 - [Source Code](https://github.com/PedroC88/Azure-pipelines-tasks)
 - [Report Issues](https://github.com/PedroC88/Azure-pipelines-tasks/issues)
 - [SqlPackage Documentation](https://docs.microsoft.com/sql/tools/sqlpackage)
-
-## 📄 License
-
-Custom non-commercial license - free for personal use. See [LICENSE](https://github.com/PedroC88/Azure-pipelines-tasks/blob/develop/LICENSE) for details.
 
 ---
 
