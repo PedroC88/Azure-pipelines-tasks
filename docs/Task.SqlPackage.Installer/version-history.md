@@ -1,6 +1,34 @@
 # Version History
 
-## v1.0.20 (Current)
+## v1.0.36 (Current)
+**Date:** January 2026
+
+### Features
+- **Smart version resolution:** Queries GitHub releases to find versions
+- **Flexible version specs:** Support for partial versions (e.g., "162", "162.0", "162.0.52")
+- **Intelligent caching:** Checks cache before downloading
+- **Enhanced messaging:** Clear feedback about version resolution and caching
+
+### Changes
+- Version spec now queries `https://api.github.com/repos/microsoft/DacFx/releases`
+- Finds latest build matching your version specification
+- Examples:
+  - `versionSpec: "latest"` → Downloads most recent release
+  - `versionSpec: "162.0.52"` → Downloads latest 162.0.52.x build
+  - `versionSpec: "162"` → Downloads latest 162.x.x.x version
+
+### User Impact
+- Can now install specific SqlPackage versions reliably
+- Better control over which version is used in pipelines
+- Clearer console output showing resolved version and download URL
+
+### Migration
+- Existing pipelines continue to work without changes
+- Consider using partial version specs for flexibility (e.g., "162.0" instead of "162.0.52.1")
+
+---
+
+## v1.0.20
 **Date:** January 2026
 
 ### Changes

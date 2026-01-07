@@ -11,12 +11,42 @@ steps:
 ```
 
 ### Install Specific Version
+
+You can specify versions in multiple formats:
+
+**Full version (4 parts):**
 ```yaml
 steps:
 - task: SqlPackageInstaller@1
   inputs:
     versionSpec: '162.0.52.1'
 ```
+
+**Major.Minor.Patch (finds latest build):**
+```yaml
+steps:
+- task: SqlPackageInstaller@1
+  inputs:
+    versionSpec: '162.0.52'  # Finds latest 162.0.52.x
+```
+
+**Major.Minor (finds latest patch and build):**
+```yaml
+steps:
+- task: SqlPackageInstaller@1
+  inputs:
+    versionSpec: '162.0'  # Finds latest 162.0.x.x
+```
+
+**Major only (finds latest minor, patch, and build):**
+```yaml
+steps:
+- task: SqlPackageInstaller@1
+  inputs:
+    versionSpec: '162'  # Finds latest 162.x.x.x
+```
+
+> **Note:** The installer queries GitHub releases to find the latest build matching your version spec.
 
 ---
 

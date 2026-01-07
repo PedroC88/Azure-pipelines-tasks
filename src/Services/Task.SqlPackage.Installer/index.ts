@@ -129,98 +129,195 @@ function getArch(): string {
     return os.arch();
 }
 
+function findMatchingVersion(versions: SqlPackageVersion[], versionSpec: string): SqlPackageVersion | undefined {
+    const isDebug = tl.getVariable('System.Debug') === 'true';
+
+    if (versionSpec === 'latest') {
+        return versions[0]; // First version is the latest
+    }
+
+    // Parse the version spec (e.g., "162", "162.0", "162.0.52")
+    const specParts = versionSpec.split('.');
+
+    if (isDebug) console.log(`Searching for versions matching spec: ${versionSpec}`);
+
+    // Find all versions that match the specified parts
+    const matches = versions.filter(v => {
+        const versionParts = v.version.split('.');
+
+        // Check if all specified parts match
+        for (let i = 0; i < specParts.length; i++) {
+            if (versionParts[i] !== specParts[i]) {
+                return false;
+            }
+        }
+        return true;
+    });
+
+    if (matches.length === 0) {
+        if (isDebug) console.log(`No versions found matching: ${versionSpec}`);
+        return undefined;
+    }
+
+    // Return the latest (first) matching version
+    const matched = matches[0];
+    if (isDebug) console.log(`Found matching version: ${matched.version}`);
+    return matched;
+}
+
+function findCachedVersionMatchingSpec(versionSpec: string, arch: string): string {
+    const isDebug = tl.getVariable('System.Debug') === 'true';
+
+    if (versionSpec === 'latest') {
+        // For 'latest', only check for exact 'latest' in cache
+        return tr.findLocalTool(toolName, 'latest', arch);
+    }
+
+    // For partial version specs, we need to find any cached version that matches
+    // Azure Pipelines caches tools in: <agent>/_work/_tool/<toolName>/<version>/<arch>
+    // We'll try to find all versions by checking progressively more specific versions
+
+    const specParts = versionSpec.split('.');
+
+    // Try exact match first (e.g., "170.2.70" matches "170.2.70")
+    let toolPath = tr.findLocalTool(toolName, versionSpec, arch);
+    if (toolPath) {
+        if (isDebug) console.log(`Found exact cache match: ${versionSpec}`);
+        return toolPath;
+    }
+
+    // For partial specs, we need to search for matching versions
+    // Try to find any version matching the partial spec
+    // E.g., for "170.2", we want to find "170.2.70", "170.2.71", etc.
+
+    // We can search by trying progressively more specific version patterns
+    // The Azure Pipelines tool cache doesn't provide a way to list all versions,
+    // so we'll try common patch versions (0-100)
+    for (let patch = 0; patch < 100; patch++) {
+        let testVersion: string;
+        if (specParts.length === 1) {
+            // Major only: try major.minor.patch
+            for (let minor = 0; minor < 20; minor++) {
+                testVersion = `${specParts[0]}.${minor}.${patch}`;
+                toolPath = tr.findLocalTool(toolName, testVersion, arch);
+                if (toolPath) {
+                    if (isDebug) console.log(`Found cached version matching spec: ${testVersion}`);
+                    return toolPath;
+                }
+            }
+        } else if (specParts.length === 2) {
+            // Major.Minor: try major.minor.patch
+            testVersion = `${specParts[0]}.${specParts[1]}.${patch}`;
+            toolPath = tr.findLocalTool(toolName, testVersion, arch);
+            if (toolPath) {
+                if (isDebug) console.log(`Found cached version matching spec: ${testVersion}`);
+                return toolPath;
+            }
+        }
+    }
+
+    return '';
+}
+
 async function acquireSqlPackage(versionSpec: string, checkLatest: boolean): Promise<string> {
     const platform = getPlatform();
     const arch = getArch();
     const isDebug = tl.getVariable('System.Debug') === 'true';
 
-    // Check if we already have this version in cache
-    let toolPath = tr.findLocalTool(toolName, versionSpec, arch);
-
-    if (!toolPath || checkLatest) {
-        // Resolve version
-        let resolvedVersion = versionSpec;
-        let downloadUrl: string;
-
-        if (versionSpec === 'latest') {
-            if (isDebug) console.log(`Downloading SqlPackage version: ${versionSpec}`);
-            const versions = await getAvailableVersions();
-            if (versions.length === 0) {
-                if (isDebug) console.log('No versions available, using direct download URL');
-                // Use the direct download URL as a last resort
-                downloadUrl = downloadUrls[platform];
-                // Get the version from the default versions for proper caching
-                const defaultVersions = getDefaultVersions();
-                resolvedVersion = defaultVersions.length > 0 ? defaultVersions[0].version : 'latest';
-                if (isDebug) console.log(`Using fallback version: ${resolvedVersion}`);
-            } else {
-                const latestVersion = versions[0];
-                if (isDebug) console.log(`Latest version object:`, JSON.stringify(latestVersion));
-                resolvedVersion = latestVersion.version;
-                downloadUrl = latestVersion.downloadUrl;
-                console.log(`Downloading SqlPackage version ${resolvedVersion}`);
-                if (isDebug) console.log(`Resolved version for caching: ${resolvedVersion}`);
-            }
-        } else {
-            // For now, use the direct download URL for the specified platform
-            downloadUrl = downloadUrls[platform];
-            if (!downloadUrl) {
-                throw new Error(`Unable to find SqlPackage version '${versionSpec}' for platform ${platform} and architecture ${arch}.`);
-            }
-            console.log(`Downloading SqlPackage version ${versionSpec}`);
+    if (!checkLatest) {
+        // Scenario 1: Check cache first for any matching version
+        const cachedPath = findCachedVersionMatchingSpec(versionSpec, arch);
+        if (cachedPath) {
+            console.log(`SqlPackage version matching '${versionSpec}' is already cached at: ${cachedPath}`);
+            return cachedPath;
         }
-
-        // Download
-        console.log(`Downloading from: ${downloadUrl}`);
-        const downloadPath = await tr.downloadTool(downloadUrl);
-        if (isDebug) console.log(`Downloaded to: ${downloadPath}`);
-        console.log('Extracting downloaded package...');
-
-        // Extract - prefer ZIP extraction for better compatibility with Docker containers
-        let extractedPath: string;
-        try {
-            // SqlPackage downloads are always ZIP files, even if the URL doesn't show .zip extension
-            if (isDebug) console.log('Extracting as ZIP file...');
-            extractedPath = await tr.extractZip(downloadPath);
-            if (isDebug) console.log(`Successfully extracted to: ${extractedPath}`);
-        } catch (extractError) {
-            if (isDebug) console.log(`ZIP extraction failed: ${extractError}`);
-            // Only try 7z as fallback if ZIP fails
-            try {
-                if (isDebug) console.log('Retrying with 7z extraction...');
-                extractedPath = await tr.extract7z(downloadPath);
-                if (isDebug) console.log(`Successfully extracted with 7z to: ${extractedPath}`);
-            } catch (retryError) {
-                throw new Error(`Failed to extract downloaded package. ZIP extraction failed: ${extractError}. 7z extraction also failed: ${retryError}`);
-            }
-        }
-
-        // Find the SqlPackage executable
-        const sqlPackagePath = await findSqlPackageExecutable(extractedPath);
-
-        if (!sqlPackagePath) {
-            throw new Error('SqlPackage executable not found in extracted package');
-        }
-
-        // Cache the tool
-        // Convert version to 3-part semantic version (Azure Pipelines Tool Library expects major.minor.patch)
-        // E.g., "170.2.70.1" becomes "170.2.70"
-        const semverVersion = resolvedVersion.split('.').slice(0, 3).join('.');
-        if (isDebug) {
-            console.log(`About to cache tool with version: ${resolvedVersion} (semver: ${semverVersion})`);
-            const sqlPackageDir = path.dirname(sqlPackagePath);
-            console.log(`SqlPackage executable path: ${sqlPackagePath}`);
-            console.log(`SqlPackage directory for caching: ${sqlPackageDir}`);
-            console.log(`Cache parameters: toolName=${toolName}, version=${semverVersion}, arch=${arch}`);
-        }
-        console.log(`Caching SqlPackage version ${semverVersion}...`);
-        const sqlPackageDir = path.dirname(sqlPackagePath);
-        toolPath = await tr.cacheDir(sqlPackageDir, toolName, semverVersion, arch);
-
-        console.log(`SqlPackage version ${semverVersion} has been installed successfully.`);
-    } else {
-        console.log(`Found SqlPackage version ${versionSpec} in cache.`);
     }
+
+    // Fetch available versions from GitHub to resolve the latest matching version
+    console.log(`Fetching available SqlPackage versions...`);
+    const versions = await getAvailableVersions();
+
+    if (versions.length === 0) {
+        throw new Error('No SqlPackage versions available. Unable to download from GitHub releases.');
+    }
+
+    if (isDebug) {
+        console.log(`Available versions: ${versions.map(v => v.version).slice(0, 10).join(', ')}${versions.length > 10 ? '...' : ''}`);
+    }
+
+    // Find the matching version (latest that matches the spec)
+    const matchedVersion = findMatchingVersion(versions, versionSpec);
+
+    if (!matchedVersion) {
+        const availableVersions = versions.map(v => v.version).slice(0, 5).join(', ');
+        throw new Error(`No SqlPackage version matching '${versionSpec}' found. Available versions include: ${availableVersions}...`);
+    }
+
+    const resolvedVersion = matchedVersion.version;
+    const downloadUrl = matchedVersion.downloadUrl;
+
+    console.log(`Resolved version: ${resolvedVersion}`);
+
+    // Scenario 2: If checkLatest=true, we've now resolved the latest version
+    // Check if this specific resolved version is cached
+    const resolvedSemver = resolvedVersion.split('.').slice(0, 3).join('.');
+    let toolPath = tr.findLocalTool(toolName, resolvedSemver, arch);
+
+    if (toolPath) {
+        console.log(`SqlPackage version ${resolvedVersion} is already cached at: ${toolPath}`);
+        return toolPath;
+    }
+
+    // Not in cache, need to download
+    console.log(`Download URL: ${downloadUrl}`);
+
+    // Download
+    console.log(`Downloading SqlPackage version ${resolvedVersion}...`);
+    console.log(`From: ${downloadUrl}`);
+    const downloadPath = await tr.downloadTool(downloadUrl);
+    if (isDebug) console.log(`Downloaded to: ${downloadPath}`);
+    console.log('Extracting downloaded package...');
+
+    // Extract - prefer ZIP extraction for better compatibility with Docker containers
+    let extractedPath: string;
+    try {
+        // SqlPackage downloads are always ZIP files, even if the URL doesn't show .zip extension
+        if (isDebug) console.log('Extracting as ZIP file...');
+        extractedPath = await tr.extractZip(downloadPath);
+        if (isDebug) console.log(`Successfully extracted to: ${extractedPath}`);
+    } catch (extractError) {
+        if (isDebug) console.log(`ZIP extraction failed: ${extractError}`);
+        // Only try 7z as fallback if ZIP fails
+        try {
+            if (isDebug) console.log('Retrying with 7z extraction...');
+            extractedPath = await tr.extract7z(downloadPath);
+            if (isDebug) console.log(`Successfully extracted with 7z to: ${extractedPath}`);
+        } catch (retryError) {
+            throw new Error(`Failed to extract downloaded package. ZIP extraction failed: ${extractError}. 7z extraction also failed: ${retryError}`);
+        }
+    }
+
+    // Find the SqlPackage executable
+    const sqlPackagePath = await findSqlPackageExecutable(extractedPath);
+
+    if (!sqlPackagePath) {
+        throw new Error('SqlPackage executable not found in extracted package');
+    }
+
+    // Cache the tool
+    const semverVersion = resolvedVersion.split('.').slice(0, 3).join('.');
+    if (isDebug) {
+        console.log(`Caching tool with version: ${resolvedVersion} (semver: ${semverVersion})`);
+        const sqlPackageDir = path.dirname(sqlPackagePath);
+        console.log(`SqlPackage executable path: ${sqlPackagePath}`);
+        console.log(`SqlPackage directory for caching: ${sqlPackageDir}`);
+        console.log(`Cache parameters: toolName=${toolName}, version=${semverVersion}, arch=${arch}`);
+    }
+    console.log(`Caching SqlPackage version ${resolvedVersion}...`);
+    const sqlPackageDir = path.dirname(sqlPackagePath);
+    toolPath = await tr.cacheDir(sqlPackageDir, toolName, semverVersion, arch);
+
+    console.log(`SqlPackage version ${resolvedVersion} has been cached and is ready at: ${toolPath}`);
 
     return toolPath;
 }

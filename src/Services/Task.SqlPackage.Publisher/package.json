@@ -1,6 +1,6 @@
 {
   "name": "sqlpackage-publisher",
-  "version": "0.0.13",
+  "version": "1.0.0",
   "description": "Azure Pipelines task to deploy SQL Server dacpac files using SqlPackage",
   "main": "index.js",
   "scripts": {

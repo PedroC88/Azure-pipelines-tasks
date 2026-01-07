@@ -470,9 +470,25 @@ describe('SqlPackage Installer Tests', () => {
 
       const cachedPath = '/cache/SqlPackage/162.0.52/x64';
 
-      // First call: not in cache, subsequent calls: in cache
-      mockFindLocalTool.mockReturnValueOnce('').mockReturnValue(cachedPath);
-      mockDownloadTool.mockResolvedValue('/tmp/sqlpackage.zip');
+      // Mock GitHub API response with matching version
+      const githubResponse = JSON.stringify([
+        {
+          tag_name: 'v162.0.52.1',
+          prerelease: false,
+          assets: [
+            {
+              name: 'sqlpackage-win-x64.zip',
+              browser_download_url: 'https://github.com/microsoft/DacFx/releases/download/v162.0.52.1/sqlpackage-win-x64.zip'
+            }
+          ]
+        }
+      ]);
+
+      // Mock findLocalTool to return empty for all cache searches (simulating no cached versions)
+      // This will be called by findCachedVersionMatchingSpec to search for any matching version
+      mockFindLocalTool.mockReturnValue('');  // Return empty for all calls - tool is not cached
+
+      mockDownloadTool.mockResolvedValueOnce('/tmp/github.json').mockResolvedValueOnce('/tmp/sqlpackage.zip');
       mockExtractZip.mockResolvedValue('/tmp/extracted');
       mockCacheDir.mockResolvedValue(cachedPath);
       mockExistsSync.mockReturnValue(true);
@@ -482,12 +498,197 @@ describe('SqlPackage Installer Tests', () => {
         isFile: () => true
       } as fs.Stats);
 
+      // Mock reading the GitHub API response
+      const mockReadFileSync = jest.spyOn(fs, 'readFileSync');
+      mockReadFileSync.mockReturnValue(githubResponse);
+
       await run();
 
       expect(mockDownloadTool).toHaveBeenCalled();
       expect(mockExtractZip).toHaveBeenCalled();
       expect(mockCacheDir).toHaveBeenCalled();
       expect(mockPrependPath).toHaveBeenCalled();
+      expect(mockSetResult).toHaveBeenCalledWith(
+        tl.TaskResult.Succeeded,
+        'SqlPackage Tool Installer completed successfully'
+      );
+
+      mockReadFileSync.mockRestore();
+    });
+  });
+
+  describe('Version Matching and Resolution', () => {
+    it('should download latest version when spec is "latest"', async () => {
+      mockGetInput.mockImplementation((name: string) => {
+        if (name === 'versionSpec') return 'latest';
+        return '';
+      });
+      mockGetBoolInput.mockReturnValue(false);
+      mockGetVariable.mockReturnValue('false');
+
+      const githubResponse = JSON.stringify([
+        {
+          tag_name: 'v170.2.70.1',
+          prerelease: false,
+          assets: [{ name: 'sqlpackage-win-x64.zip', browser_download_url: 'https://example.com/170.2.70.1.zip' }]
+        },
+        {
+          tag_name: 'v162.0.52.1',
+          prerelease: false,
+          assets: [{ name: 'sqlpackage-win-x64.zip', browser_download_url: 'https://example.com/162.0.52.1.zip' }]
+        }
+      ]);
+
+      mockFindLocalTool.mockReturnValue('');
+      mockDownloadTool.mockResolvedValueOnce('/tmp/github.json').mockResolvedValueOnce('/tmp/sqlpackage.zip');
+      mockExtractZip.mockResolvedValue('/tmp/extracted');
+      mockCacheDir.mockResolvedValue('/cache/SqlPackage/170.2.70/x64');
+      mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockReturnValue(['sqlpackage.exe']);
+      mockStatSync.mockReturnValue({ isDirectory: () => false, isFile: () => true } as fs.Stats);
+
+      const mockReadFileSync = jest.spyOn(fs, 'readFileSync');
+      mockReadFileSync.mockReturnValue(githubResponse);
+
+      await run();
+
+      expect(mockSetResult).toHaveBeenCalledWith(tl.TaskResult.Succeeded, 'SqlPackage Tool Installer completed successfully');
+      mockReadFileSync.mockRestore();
+    });
+
+    it('should match partial version spec (major.minor)', async () => {
+      mockGetInput.mockImplementation((name: string) => {
+        if (name === 'versionSpec') return '162.0';
+        return '';
+      });
+      mockGetBoolInput.mockReturnValue(false);
+      mockGetVariable.mockReturnValue('false');
+
+      const githubResponse = JSON.stringify([
+        {
+          tag_name: 'v170.2.70.1',
+          prerelease: false,
+          assets: [{ name: 'sqlpackage-win-x64.zip', browser_download_url: 'https://example.com/170.2.70.1.zip' }]
+        },
+        {
+          tag_name: 'v162.0.54.1',
+          prerelease: false,
+          assets: [{ name: 'sqlpackage-win-x64.zip', browser_download_url: 'https://example.com/162.0.54.1.zip' }]
+        },
+        {
+          tag_name: 'v162.0.52.1',
+          prerelease: false,
+          assets: [{ name: 'sqlpackage-win-x64.zip', browser_download_url: 'https://example.com/162.0.52.1.zip' }]
+        }
+      ]);
+
+      mockFindLocalTool.mockReturnValue('');
+      mockDownloadTool.mockResolvedValueOnce('/tmp/github.json').mockResolvedValueOnce('/tmp/sqlpackage.zip');
+      mockExtractZip.mockResolvedValue('/tmp/extracted');
+      mockCacheDir.mockResolvedValue('/cache/SqlPackage/162.0.54/x64');
+      mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockReturnValue(['sqlpackage.exe']);
+      mockStatSync.mockReturnValue({ isDirectory: () => false, isFile: () => true } as fs.Stats);
+
+      const mockReadFileSync = jest.spyOn(fs, 'readFileSync');
+      mockReadFileSync.mockReturnValue(githubResponse);
+
+      await run();
+
+      expect(mockSetResult).toHaveBeenCalledWith(tl.TaskResult.Succeeded, 'SqlPackage Tool Installer completed successfully');
+      mockReadFileSync.mockRestore();
+    });
+
+    it('should match partial version spec (major only)', async () => {
+      mockGetInput.mockImplementation((name: string) => {
+        if (name === 'versionSpec') return '162';
+        return '';
+      });
+      mockGetBoolInput.mockReturnValue(false);
+      mockGetVariable.mockReturnValue('false');
+
+      const githubResponse = JSON.stringify([
+        {
+          tag_name: 'v170.2.70.1',
+          prerelease: false,
+          assets: [{ name: 'sqlpackage-win-x64.zip', browser_download_url: 'https://example.com/170.2.70.1.zip' }]
+        },
+        {
+          tag_name: 'v162.5.10.1',
+          prerelease: false,
+          assets: [{ name: 'sqlpackage-win-x64.zip', browser_download_url: 'https://example.com/162.5.10.1.zip' }]
+        },
+        {
+          tag_name: 'v162.0.52.1',
+          prerelease: false,
+          assets: [{ name: 'sqlpackage-win-x64.zip', browser_download_url: 'https://example.com/162.0.52.1.zip' }]
+        }
+      ]);
+
+      mockFindLocalTool.mockReturnValue('');
+      mockDownloadTool.mockResolvedValueOnce('/tmp/github.json').mockResolvedValueOnce('/tmp/sqlpackage.zip');
+      mockExtractZip.mockResolvedValue('/tmp/extracted');
+      mockCacheDir.mockResolvedValue('/cache/SqlPackage/162.5.10/x64');
+      mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockReturnValue(['sqlpackage.exe']);
+      mockStatSync.mockReturnValue({ isDirectory: () => false, isFile: () => true } as fs.Stats);
+
+      const mockReadFileSync = jest.spyOn(fs, 'readFileSync');
+      mockReadFileSync.mockReturnValue(githubResponse);
+
+      await run();
+
+      expect(mockSetResult).toHaveBeenCalledWith(tl.TaskResult.Succeeded, 'SqlPackage Tool Installer completed successfully');
+      mockReadFileSync.mockRestore();
+    });
+
+    it('should fail when no matching version is found', async () => {
+      mockGetInput.mockImplementation((name: string) => {
+        if (name === 'versionSpec') return '999.9.9';
+        return '';
+      });
+      mockGetBoolInput.mockReturnValue(false);
+      mockGetVariable.mockReturnValue('false');
+
+      const githubResponse = JSON.stringify([
+        {
+          tag_name: 'v170.2.70.1',
+          prerelease: false,
+          assets: [{ name: 'sqlpackage-win-x64.zip', browser_download_url: 'https://example.com/170.2.70.1.zip' }]
+        }
+      ]);
+
+      mockFindLocalTool.mockReturnValue('');
+      mockDownloadTool.mockResolvedValue('/tmp/github.json');
+      mockExistsSync.mockReturnValue(true);
+
+      const mockReadFileSync = jest.spyOn(fs, 'readFileSync');
+      mockReadFileSync.mockReturnValue(githubResponse);
+
+      await run();
+
+      expect(mockSetResult).toHaveBeenCalledWith(
+        tl.TaskResult.Failed,
+        expect.stringContaining('No SqlPackage version matching')
+      );
+
+      mockReadFileSync.mockRestore();
+    });
+
+    it('should use cached version when available', async () => {
+      mockGetInput.mockImplementation((name: string) => {
+        if (name === 'versionSpec') return '162.0.52';
+        return '';
+      });
+      mockGetBoolInput.mockReturnValue(false);
+      mockGetVariable.mockReturnValue('false');
+
+      const cachedPath = '/cache/SqlPackage/162.0.52/x64';
+      mockFindLocalTool.mockReturnValue(cachedPath);
+
+      await run();
+
+      expect(mockDownloadTool).not.toHaveBeenCalled();
       expect(mockSetResult).toHaveBeenCalledWith(
         tl.TaskResult.Succeeded,
         'SqlPackage Tool Installer completed successfully'
