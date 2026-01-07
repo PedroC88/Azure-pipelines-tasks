@@ -223,6 +223,11 @@ describe('SqlPackage Publisher Tests', () => {
                 .mockReturnValueOnce('windowsAuthentication');
 
             mockExistsSync.mockReturnValue(true);
+
+            // Mock statSync to return a file
+            const mockStatSync = jest.spyOn(fs, 'statSync');
+            mockStatSync.mockReturnValueOnce({ isFile: () => true } as any);
+
             mockExec.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
 
             await run();
@@ -230,6 +235,8 @@ describe('SqlPackage Publisher Tests', () => {
             expect(mockExec).toHaveBeenCalledWith('sqlpackage', expect.arrayContaining([
                 '/Profile:/path/to/profile.publish.xml'
             ]));
+
+            mockStatSync.mockRestore();
         });
 
         it('should skip publish profile if file does not exist', async () => {
@@ -273,6 +280,57 @@ describe('SqlPackage Publisher Tests', () => {
             const sqlPackageCall = execCalls.find(call => call[0] === 'sqlpackage' && call[1].length > 1);
             const profileArg = sqlPackageCall?.[1].find((arg: string) => arg.startsWith('/Profile:'));
             expect(profileArg).toBeUndefined();
+        });
+
+        it('should skip publish profile if empty string is provided', async () => {
+            mockGetPathInput
+                .mockReturnValueOnce('/path/to/test.dacpac')
+                .mockReturnValueOnce('   '); // empty/whitespace profile
+            mockGetInput.mockReturnValueOnce('server').mockReturnValueOnce('');
+            mockGetInput
+                .mockReturnValueOnce('myserver')
+                .mockReturnValueOnce('mydb')
+                .mockReturnValueOnce('windowsAuthentication');
+
+            mockExistsSync.mockReturnValueOnce(true); // dacpac exists
+            mockExec.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
+
+            await run();
+
+            const execCalls = mockExec.mock.calls;
+            const sqlPackageCall = execCalls.find(call => call[0] === 'sqlpackage' && call[1].length > 1);
+            const profileArg = sqlPackageCall?.[1].find((arg: string) => arg.startsWith('/Profile:'));
+            expect(profileArg).toBeUndefined();
+        });
+
+        it('should skip publish profile if it is a directory not a file', async () => {
+            mockGetPathInput
+                .mockReturnValueOnce('/path/to/test.dacpac')
+                .mockReturnValueOnce('/path/to/directory');
+            mockGetInput.mockReturnValueOnce('server').mockReturnValueOnce('');
+            mockGetInput
+                .mockReturnValueOnce('myserver')
+                .mockReturnValueOnce('mydb')
+                .mockReturnValueOnce('windowsAuthentication');
+
+            mockExistsSync
+                .mockReturnValueOnce(true) // dacpac exists
+                .mockReturnValueOnce(true); // directory exists
+
+            // Mock statSync to return a directory
+            const mockStatSync = jest.spyOn(fs, 'statSync');
+            mockStatSync.mockReturnValueOnce({ isFile: () => false } as any);
+
+            mockExec.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
+
+            await run();
+
+            const execCalls = mockExec.mock.calls;
+            const sqlPackageCall = execCalls.find(call => call[0] === 'sqlpackage' && call[1].length > 1);
+            const profileArg = sqlPackageCall?.[1].find((arg: string) => arg.startsWith('/Profile:'));
+            expect(profileArg).toBeUndefined();
+
+            mockStatSync.mockRestore();
         });
     });
 

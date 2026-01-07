@@ -127,10 +127,16 @@ export async function run() {
             args.push(`/TargetConnectionString:${connectionString}`);
         }
 
-        // Publish profile - only add if explicitly provided
-        if (publishProfile && publishProfile.trim() !== '' && fs.existsSync(publishProfile)) {
-            console.log(`Using publish profile: ${publishProfile}`);
-            args.push(`/Profile:${publishProfile}`);
+        // Publish profile - only add if a value is provided and it's a valid file
+        if (publishProfile) {
+            const trimmedProfile = publishProfile.trim();
+            if (trimmedProfile !== '') {
+                // Value was provided, now validate it's a file
+                if (fs.existsSync(trimmedProfile) && fs.statSync(trimmedProfile).isFile()) {
+                    console.log(`Using publish profile: ${trimmedProfile}`);
+                    args.push(`/Profile:${trimmedProfile}`);
+                }
+            }
         }
 
         // Additional arguments
