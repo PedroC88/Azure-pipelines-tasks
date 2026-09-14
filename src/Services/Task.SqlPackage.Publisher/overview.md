@@ -26,7 +26,7 @@ Custom non-commercial license - free for personal use. See [LICENSE](https://git
 ## ✨ Features
 
 - **Cross-Platform** - Works on Windows, Linux, and macOS agents
-- **Multiple Authentication** - Windows, SQL Server, and Azure Active Directory
+- **Multiple Authentication** - Windows, SQL Server, Azure Active Directory, and Entra Integrated (Service Connections)
 - **Publish Profiles** - Support for XML publish profile files
 - **Connection Strings** - Direct connection string support
 - **Flexible Configuration** - Additional SqlPackage arguments support
@@ -39,7 +39,8 @@ Custom non-commercial license - free for personal use. See [LICENSE](https://git
 | `targetMethod` | Connection method: server or connectionString | ✅ | server |
 | `serverName` | SQL Server name or address | ✅ (if server) | - |
 | `databaseName` | Target database name | ✅ (if server) | - |
-| `authenticationType` | Authentication method | ✅ | windowsAuthentication |
+| `authenticationType` | Authentication method (`windowsAuthentication`, `sqlServerAuthentication`, `azureActiveDirectory`, `entraIntegrated`) | ✅ | windowsAuthentication |
+| `azureSubscription` | Azure DevOps ARM service connection for Entra ID deployment | ✅ (if entraIntegrated) | - |
 | `sqlUsername` | SQL username | ✅ (if SQL auth) | - |
 | `sqlPassword` | SQL password (use secret variable) | ✅ (if SQL auth) | - |
 | `connectionString` | Full connection string | ✅ (if connectionString) | - |
@@ -47,6 +48,18 @@ Custom non-commercial license - free for personal use. See [LICENSE](https://git
 | `additionalArguments` | Extra SqlPackage arguments | ❌ | - |
 
 ## 📖 Usage Examples
+
+### Entra Integrated Authentication (Azure Service Connection)
+
+```yaml
+- task: SqlPackagePublisher@0
+  inputs:
+    dacpacFile: '$(Build.ArtifactStagingDirectory)/MyDatabase.dacpac'
+    serverName: 'myserver.database.windows.net'
+    databaseName: 'MyDatabase'
+    authenticationType: 'entraIntegrated'
+    azureSubscription: 'MyAzureRMServiceConnection'
+```
 
 ### Windows Authentication
 

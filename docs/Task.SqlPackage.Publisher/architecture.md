@@ -58,10 +58,11 @@ Execute SqlPackage
 ## Key Design Decisions
 
 ### Authentication Flexibility
-Supports three authentication methods:
+Supports four authentication methods:
 1. **Windows Authentication** - Integrated Security for domain accounts
 2. **SQL Server Authentication** - Username/password authentication
-3. **Azure Active Directory** - Cloud-native authentication for Azure SQL
+3. **Azure Active Directory** - Integrated authentication for Azure SQL
+4. **Entra Integrated** - Microsoft Entra ID authentication using an Azure DevOps Service Connection (`connectedService:AzureRM`), supporting Service Principal (Client Secret), Workload Identity Federation (OIDC token), Managed Identity, and direct Access Tokens. The task dynamically acquires an Azure SQL access token (scoped to `https://database.windows.net/.default` or sovereign cloud equivalent) and passes it to SqlPackage via the `/AccessToken:<token>` parameter, while automatically masking the token using `tl.setSecret()`.
 
 ### Dual Connection Modes
 - **Server Details** - Specify server, database, and authentication separately
@@ -84,7 +85,7 @@ Organized for clarity in Azure DevOps UI:
 |-------|--------|---------|
 | Source | dacpacFile | DACPAC file to deploy |
 | Target | targetMethod, serverName, databaseName, connectionString | Connection configuration |
-| Authentication | authenticationType, sqlUsername, sqlPassword | Credentials |
+| Authentication | authenticationType, azureSubscription, sqlUsername, sqlPassword | Credentials |
 | Options | publishProfile, additionalArguments | Optional deployment settings |
 
 ## Platform Support

@@ -64,8 +64,18 @@
       "options": {
         "windowsAuthentication": "Windows Authentication",
         "sqlServerAuthentication": "SQL Server Authentication",
-        "azureActiveDirectory": "Azure Active Directory"
+        "azureActiveDirectory": "Azure Active Directory",
+        "entraIntegrated": "Entra Integrated"
       }
+    },
+    {
+      "name": "azureSubscription",
+      "type": "connectedService:AzureRM",
+      "label": "Azure Subscription",
+      "defaultValue": "",
+      "required": true,
+      "helpMarkDown": "Select the Azure Resource Manager service connection for Microsoft Entra ID authentication",
+      "visibleRule": "authenticationType = entraIntegrated"
     },
     {
       "name": "sqlUsername",

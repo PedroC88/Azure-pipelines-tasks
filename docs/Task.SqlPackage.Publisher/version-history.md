@@ -9,6 +9,7 @@
   - Windows Authentication (Integrated Security)
   - SQL Server Authentication (username/password)
   - Azure Active Directory (Integrated)
+  - Entra Integrated (Azure DevOps AzureRM Service Connections with Service Principal, Workload Identity Federation, Managed Identity, and Access Token)
 - Dual connection modes:
   - Server details (server, database, authentication)
   - Direct connection string
@@ -57,8 +58,7 @@
 
 ### Short Term (v0.x)
 - [ ] Add test coverage badges
-- [ ] Implement Managed Identity authentication
-- [ ] Add Service Principal authentication
+- [x] Implement Entra Integrated (Managed Identity, Service Principal, Workload Identity Federation)
 - [ ] Improve error messages with actionable suggestions
 - [ ] Add drift detection option
 - [ ] Support for multiple DACPAC deployments
