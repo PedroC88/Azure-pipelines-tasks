@@ -3,11 +3,22 @@ process.env.NODE_ENV = 'test';
 
 import * as tl from 'azure-pipelines-task-lib/task';
 import * as fs from 'fs';
-import { run, parseAdditionalArguments } from '../index';
+import * as https from 'https';
+import * as http from 'http';
+import { EventEmitter } from 'events';
+import {
+    run,
+    parseAdditionalArguments,
+    getEntraAccessToken,
+    getSqlResourceForServer,
+    requestUrl
+} from '../index';
 
 // Mock modules
 jest.mock('azure-pipelines-task-lib/task');
 jest.mock('fs');
+jest.mock('https');
+jest.mock('http');
 
 describe('SqlPackage Publisher Tests', () => {
     let mockGetInput: jest.Mock;
@@ -15,6 +26,13 @@ describe('SqlPackage Publisher Tests', () => {
     let mockExec: jest.Mock;
     let mockSetResult: jest.Mock;
     let mockExistsSync: jest.Mock;
+    let mockGetEndpointAuthorization: jest.Mock;
+    let mockGetEndpointAuthorizationScheme: jest.Mock;
+    let mockGetEndpointAuthorizationParameter: jest.Mock;
+    let mockGetEndpointDataParameter: jest.Mock;
+    let mockSetSecret: jest.Mock;
+    let mockHttpsRequest: jest.Mock;
+    let mockHttpRequest: jest.Mock;
     let consoleLogSpy: jest.SpyInstance;
     let consoleErrorSpy: jest.SpyInstance;
 
@@ -27,13 +45,26 @@ describe('SqlPackage Publisher Tests', () => {
         mockExec = tl.exec as jest.Mock;
         mockSetResult = tl.setResult as jest.Mock;
         mockExistsSync = fs.existsSync as jest.Mock;
+        mockGetEndpointAuthorization = tl.getEndpointAuthorization as jest.Mock;
+        mockGetEndpointAuthorizationScheme = tl.getEndpointAuthorizationScheme as jest.Mock;
+        mockGetEndpointAuthorizationParameter = tl.getEndpointAuthorizationParameter as jest.Mock;
+        mockGetEndpointDataParameter = tl.getEndpointDataParameter as jest.Mock;
+        mockSetSecret = tl.setSecret as jest.Mock;
+        mockHttpsRequest = https.request as unknown as jest.Mock;
+        mockHttpRequest = http.request as unknown as jest.Mock;
 
         consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
         consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 
         // Default successful responses
-        mockExec.mockResolvedValue(0);
-        mockExistsSync.mockReturnValue(true);
+        mockExec.mockReset().mockResolvedValue(0);
+        mockExistsSync.mockReset().mockReturnValue(true);
+        mockGetPathInput.mockReset().mockReturnValue('');
+        mockGetInput.mockReset().mockReturnValue('');
+        mockGetEndpointAuthorization.mockReset().mockReturnValue(undefined);
+        mockGetEndpointAuthorizationScheme.mockReset().mockReturnValue(undefined);
+        mockGetEndpointAuthorizationParameter.mockReset().mockReturnValue(undefined);
+        mockGetEndpointDataParameter.mockReset().mockReturnValue(undefined);
     });
 
     afterEach(() => {
@@ -173,6 +204,545 @@ describe('SqlPackage Publisher Tests', () => {
                 '/TargetDatabaseName:mydb',
                 '/TargetAuthenticationType:ActiveDirectoryIntegrated'
             ]));
+        });
+    });
+
+    describe('Entra Integrated Authentication', () => {
+        function mockHttpResponse(statusCode: number, data: string, isHttp = false) {
+            const mockReq = new EventEmitter() as any;
+            mockReq.write = jest.fn();
+            mockReq.end = jest.fn();
+
+            const mockFn = isHttp ? mockHttpRequest : mockHttpsRequest;
+            const spy = mockFn.mockImplementation(((...args: any[]) => {
+                const callback = args.find((a: any) => typeof a === 'function');
+                const mockRes = new EventEmitter() as any;
+                mockRes.statusCode = statusCode;
+
+                process.nextTick(() => {
+                    if (callback) {
+                        callback(mockRes);
+                    }
+                    mockRes.emit('data', data);
+                    mockRes.emit('end');
+                });
+
+                return mockReq;
+            }) as any);
+
+            return { spy, mockReq };
+        }
+
+        it('should build correct arguments using direct AccessToken in service connection', async () => {
+            mockGetPathInput.mockReturnValueOnce('/path/to/test.dacpac').mockReturnValueOnce(null);
+            mockGetInput
+                .mockReturnValueOnce('server')
+                .mockReturnValueOnce('')
+                .mockReturnValueOnce('myserver.database.windows.net')
+                .mockReturnValueOnce('mydb')
+                .mockReturnValueOnce('entraIntegrated')
+                .mockReturnValueOnce('MyServiceConnection');
+
+            mockGetEndpointAuthorization.mockReturnValue({
+                scheme: 'OAuth',
+                parameters: {
+                    AccessToken: 'direct-access-token-123'
+                }
+            });
+
+            mockExec.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
+
+            await run();
+
+            expect(mockSetSecret).toHaveBeenCalledWith('direct-access-token-123');
+            expect(mockExec).toHaveBeenCalledWith('sqlpackage', expect.arrayContaining([
+                '/Action:Publish',
+                '/SourceFile:/path/to/test.dacpac',
+                '/TargetServerName:myserver.database.windows.net',
+                '/TargetDatabaseName:mydb',
+                '/AccessToken:direct-access-token-123'
+            ]));
+        });
+
+        it('should acquire token using Service Principal with client secret', async () => {
+            const { spy } = mockHttpResponse(200, JSON.stringify({
+                access_token: 'sp-secret-token-456',
+                token_type: 'Bearer',
+                expires_in: 3599
+            }));
+
+            mockGetPathInput.mockReturnValueOnce('/path/to/test.dacpac').mockReturnValueOnce(null);
+            mockGetInput
+                .mockReturnValueOnce('server')
+                .mockReturnValueOnce('')
+                .mockReturnValueOnce('myserver.database.windows.net')
+                .mockReturnValueOnce('mydb')
+                .mockReturnValueOnce('entraIntegrated')
+                .mockReturnValueOnce('MySPServiceConnection');
+
+            mockGetEndpointAuthorization.mockReturnValue({
+                scheme: 'ServicePrincipal',
+                parameters: {
+                    tenantid: 'tenant-guid',
+                    serviceprincipalid: 'client-guid',
+                    serviceprincipalkey: 'secret-key-xyz'
+                }
+            });
+
+            mockExec.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
+
+            await run();
+
+            expect(mockSetSecret).toHaveBeenCalledWith('sp-secret-token-456');
+            expect(mockExec).toHaveBeenCalledWith('sqlpackage', expect.arrayContaining([
+                '/Action:Publish',
+                '/SourceFile:/path/to/test.dacpac',
+                '/TargetServerName:myserver.database.windows.net',
+                '/TargetDatabaseName:mydb',
+                '/AccessToken:sp-secret-token-456'
+            ]));
+
+            spy.mockRestore();
+        });
+
+        it('should acquire token using Workload Identity Federation with federatedToken', async () => {
+            const { spy, mockReq } = mockHttpResponse(200, JSON.stringify({
+                access_token: 'wif-token-789',
+                token_type: 'Bearer',
+                expires_in: 3599
+            }));
+
+            mockGetPathInput.mockReturnValueOnce('/path/to/test.dacpac').mockReturnValueOnce(null);
+            mockGetInput
+                .mockReturnValueOnce('server')
+                .mockReturnValueOnce('')
+                .mockReturnValueOnce('myserver.database.windows.net')
+                .mockReturnValueOnce('mydb')
+                .mockReturnValueOnce('entraIntegrated')
+                .mockReturnValueOnce('MyWIFServiceConnection');
+
+            mockGetEndpointAuthorization.mockReturnValue({
+                scheme: 'WorkloadIdentityFederation',
+                parameters: {
+                    tenantid: 'tenant-guid',
+                    serviceprincipalid: 'client-guid',
+                    federatedToken: 'fed-token-abc'
+                }
+            });
+
+            mockExec.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
+
+            await run();
+
+            expect(mockReq.write).toHaveBeenCalledWith(expect.stringContaining('client_assertion=fed-token-abc'));
+            expect(mockSetSecret).toHaveBeenCalledWith('wif-token-789');
+            expect(mockExec).toHaveBeenCalledWith('sqlpackage', expect.arrayContaining([
+                '/AccessToken:wif-token-789'
+            ]));
+
+            spy.mockRestore();
+        });
+
+        it('should acquire token using Workload Identity Federation falling back to process.env.SYSTEM_ACCESSTOKEN', async () => {
+            const originalEnv = process.env.SYSTEM_ACCESSTOKEN;
+            process.env.SYSTEM_ACCESSTOKEN = 'env-oidc-token';
+
+            const { spy, mockReq } = mockHttpResponse(200, JSON.stringify({
+                access_token: 'wif-env-token',
+                token_type: 'Bearer',
+                expires_in: 3599
+            }));
+
+            mockGetPathInput.mockReturnValueOnce('/path/to/test.dacpac').mockReturnValueOnce(null);
+            mockGetInput
+                .mockReturnValueOnce('server')
+                .mockReturnValueOnce('')
+                .mockReturnValueOnce('myserver.database.windows.net')
+                .mockReturnValueOnce('mydb')
+                .mockReturnValueOnce('entraIntegrated')
+                .mockReturnValueOnce('MyWIFServiceConnection');
+
+            mockGetEndpointAuthorization.mockReturnValue({
+                scheme: 'WorkloadIdentityFederation',
+                parameters: {
+                    tenantid: 'tenant-guid',
+                    serviceprincipalid: 'client-guid'
+                }
+            });
+
+            mockExec.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
+
+            await run();
+
+            expect(mockReq.write).toHaveBeenCalledWith(expect.stringContaining('client_assertion=env-oidc-token'));
+            expect(mockSetSecret).toHaveBeenCalledWith('wif-env-token');
+
+            if (originalEnv === undefined) {
+                delete process.env.SYSTEM_ACCESSTOKEN;
+            } else {
+                process.env.SYSTEM_ACCESSTOKEN = originalEnv;
+            }
+            spy.mockRestore();
+        });
+
+        it('should acquire token using Managed Service Identity', async () => {
+            const { spy } = mockHttpResponse(200, JSON.stringify({
+                access_token: 'msi-token-101',
+                token_type: 'Bearer',
+                expires_in: 3599
+            }), true);
+
+            mockGetPathInput.mockReturnValueOnce('/path/to/test.dacpac').mockReturnValueOnce(null);
+            mockGetInput
+                .mockReturnValueOnce('server')
+                .mockReturnValueOnce('')
+                .mockReturnValueOnce('myserver.database.windows.net')
+                .mockReturnValueOnce('mydb')
+                .mockReturnValueOnce('entraIntegrated')
+                .mockReturnValueOnce('MyMSIServiceConnection');
+
+            mockGetEndpointAuthorization.mockReturnValue({
+                scheme: 'ManagedServiceIdentity',
+                parameters: {}
+            });
+
+            mockExec.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
+
+            await run();
+
+            expect(mockSetSecret).toHaveBeenCalledWith('msi-token-101');
+            expect(mockExec).toHaveBeenCalledWith('sqlpackage', expect.arrayContaining([
+                '/AccessToken:msi-token-101'
+            ]));
+
+            spy.mockRestore();
+        });
+
+        it('should use correct resource and scope for US Gov cloud', async () => {
+            const { spy, mockReq } = mockHttpResponse(200, JSON.stringify({
+                access_token: 'gov-token',
+                token_type: 'Bearer'
+            }));
+
+            mockGetPathInput.mockReturnValueOnce('/path/to/test.dacpac').mockReturnValueOnce(null);
+            mockGetInput
+                .mockReturnValueOnce('server')
+                .mockReturnValueOnce('')
+                .mockReturnValueOnce('myserver.database.usgovcloudapi.net')
+                .mockReturnValueOnce('mydb')
+                .mockReturnValueOnce('entraIntegrated')
+                .mockReturnValueOnce('GovConnection');
+
+            mockGetEndpointAuthorization.mockReturnValue({
+                scheme: 'ServicePrincipal',
+                parameters: {
+                    tenantid: 'tenant-gov',
+                    serviceprincipalid: 'client-gov',
+                    serviceprincipalkey: 'key-gov'
+                }
+            });
+
+            mockExec.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
+
+            await run();
+
+            expect(mockReq.write).toHaveBeenCalledWith(expect.stringContaining(encodeURIComponent('https://database.usgovcloudapi.net/.default')));
+            expect(mockExec).toHaveBeenCalledWith('sqlpackage', expect.arrayContaining([
+                '/AccessToken:gov-token'
+            ]));
+
+            spy.mockRestore();
+        });
+
+        it('should use correct resource and scope for China cloud', async () => {
+            const { spy, mockReq } = mockHttpResponse(200, JSON.stringify({
+                access_token: 'china-token',
+                token_type: 'Bearer'
+            }));
+
+            mockGetPathInput.mockReturnValueOnce('/path/to/test.dacpac').mockReturnValueOnce(null);
+            mockGetInput
+                .mockReturnValueOnce('server')
+                .mockReturnValueOnce('')
+                .mockReturnValueOnce('myserver.database.chinacloudapi.cn')
+                .mockReturnValueOnce('mydb')
+                .mockReturnValueOnce('entraIntegrated')
+                .mockReturnValueOnce('ChinaConnection');
+
+            mockGetEndpointAuthorization.mockReturnValue({
+                scheme: 'ServicePrincipal',
+                parameters: {
+                    tenantid: 'tenant-china',
+                    serviceprincipalid: 'client-china',
+                    serviceprincipalkey: 'key-china'
+                }
+            });
+
+            mockExec.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
+
+            await run();
+
+            expect(mockReq.write).toHaveBeenCalledWith(expect.stringContaining(encodeURIComponent('https://database.chinacloudapi.cn/.default')));
+            expect(mockExec).toHaveBeenCalledWith('sqlpackage', expect.arrayContaining([
+                '/AccessToken:china-token'
+            ]));
+
+            spy.mockRestore();
+        });
+
+        it('should use custom authority URL when configured in endpoint data', async () => {
+            let requestedUrl = '';
+            const mockReq = new EventEmitter() as any;
+            mockReq.write = jest.fn();
+            mockReq.end = jest.fn();
+
+            mockHttpsRequest.mockImplementation((url: any, _options: any, callback: any) => {
+                requestedUrl = url.toString();
+                const mockRes = new EventEmitter() as any;
+                mockRes.statusCode = 200;
+
+                process.nextTick(() => {
+                    if (callback) callback(mockRes);
+                    mockRes.emit('data', JSON.stringify({ access_token: 'custom-auth-token' }));
+                    mockRes.emit('end');
+                });
+
+                return mockReq;
+            });
+
+            mockGetPathInput.mockReturnValueOnce('/path/to/test.dacpac').mockReturnValueOnce(null);
+            mockGetInput
+                .mockReturnValueOnce('server')
+                .mockReturnValueOnce('')
+                .mockReturnValueOnce('myserver.database.windows.net')
+                .mockReturnValueOnce('mydb')
+                .mockReturnValueOnce('entraIntegrated')
+                .mockReturnValueOnce('CustomConnection');
+
+            mockGetEndpointAuthorization.mockReturnValue({
+                scheme: 'ServicePrincipal',
+                parameters: {
+                    tenantid: 'my-tenant',
+                    serviceprincipalid: 'my-client',
+                    serviceprincipalkey: 'my-key'
+                }
+            });
+
+            mockGetEndpointDataParameter.mockImplementation((_sc: string, param: string) => {
+                if (param === 'environmentAuthorityUrl' || param === 'activeDirectoryAuthority') {
+                    return 'https://login.microsoftonline.us';
+                }
+                return undefined;
+            });
+
+            mockExec.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
+
+            await run();
+
+            expect(requestedUrl).toContain('https://login.microsoftonline.us/my-tenant/oauth2/v2.0/token');
+            expect(mockExec).toHaveBeenCalledWith('sqlpackage', expect.arrayContaining([
+                '/AccessToken:custom-auth-token'
+            ]));
+        });
+
+        it('should fail if azureSubscription input is missing', async () => {
+            mockGetPathInput.mockReturnValueOnce('/path/to/test.dacpac');
+            mockGetInput
+                .mockReturnValueOnce('server')
+                .mockReturnValueOnce('')
+                .mockReturnValueOnce('myserver')
+                .mockReturnValueOnce('mydb')
+                .mockReturnValueOnce('entraIntegrated')
+                .mockReturnValueOnce(''); // missing azureSubscription
+
+            mockExec.mockResolvedValueOnce(0);
+
+            await run();
+
+            expect(mockSetResult).toHaveBeenCalledWith(
+                tl.TaskResult.Failed,
+                expect.stringContaining('Azure Subscription / Service Connection is required')
+            );
+        });
+
+        it('should fail if tenant ID or service principal ID is missing', async () => {
+            mockGetPathInput.mockReturnValueOnce('/path/to/test.dacpac');
+            mockGetInput
+                .mockReturnValueOnce('server')
+                .mockReturnValueOnce('')
+                .mockReturnValueOnce('myserver')
+                .mockReturnValueOnce('mydb')
+                .mockReturnValueOnce('entraIntegrated')
+                .mockReturnValueOnce('BadConnection');
+
+            mockGetEndpointAuthorization.mockReturnValue({
+                scheme: 'ServicePrincipal',
+                parameters: {
+                    serviceprincipalkey: 'key-only'
+                }
+            });
+
+            mockExec.mockResolvedValueOnce(0);
+
+            await run();
+
+            expect(mockSetResult).toHaveBeenCalledWith(
+                tl.TaskResult.Failed,
+                expect.stringContaining('missing tenant ID or service principal ID')
+            );
+        });
+
+        it('should fail if no valid credentials found for service connection', async () => {
+            mockGetPathInput.mockReturnValueOnce('/path/to/test.dacpac');
+            mockGetInput
+                .mockReturnValueOnce('server')
+                .mockReturnValueOnce('')
+                .mockReturnValueOnce('myserver')
+                .mockReturnValueOnce('mydb')
+                .mockReturnValueOnce('entraIntegrated')
+                .mockReturnValueOnce('EmptyConnection');
+
+            mockGetEndpointAuthorization.mockReturnValue({
+                scheme: 'ServicePrincipal',
+                parameters: {
+                    tenantid: 't-id',
+                    serviceprincipalid: 'sp-id'
+                    // No key, no federated token, no access token
+                }
+            });
+
+            mockExec.mockResolvedValueOnce(0);
+
+            await run();
+
+            expect(mockSetResult).toHaveBeenCalledWith(
+                tl.TaskResult.Failed,
+                expect.stringContaining('Could not find valid credentials')
+            );
+        });
+
+        it('should fail if token endpoint returns an error status with error_description', async () => {
+            const { spy } = mockHttpResponse(400, JSON.stringify({
+                error: 'invalid_client',
+                error_description: 'AADSTS7000215: Invalid client secret is provided.'
+            }));
+
+            mockGetPathInput.mockReturnValueOnce('/path/to/test.dacpac');
+            mockGetInput
+                .mockReturnValueOnce('server')
+                .mockReturnValueOnce('')
+                .mockReturnValueOnce('myserver.database.windows.net')
+                .mockReturnValueOnce('mydb')
+                .mockReturnValueOnce('entraIntegrated')
+                .mockReturnValueOnce('FailedConnection');
+
+            mockGetEndpointAuthorization.mockReturnValue({
+                scheme: 'ServicePrincipal',
+                parameters: {
+                    tenantid: 't-id',
+                    serviceprincipalid: 'sp-id',
+                    serviceprincipalkey: 'wrong-key'
+                }
+            });
+
+            mockExec.mockResolvedValueOnce(0);
+
+            await run();
+
+            expect(mockSetResult).toHaveBeenCalledWith(
+                tl.TaskResult.Failed,
+                expect.stringContaining('AADSTS7000215: Invalid client secret is provided.')
+            );
+
+            spy.mockRestore();
+        });
+
+        it('should fail if IMDS endpoint returns an error', async () => {
+            const { spy } = mockHttpResponse(500, 'Internal Server Error', true);
+
+            mockGetPathInput.mockReturnValueOnce('/path/to/test.dacpac');
+            mockGetInput
+                .mockReturnValueOnce('server')
+                .mockReturnValueOnce('')
+                .mockReturnValueOnce('myserver.database.windows.net')
+                .mockReturnValueOnce('mydb')
+                .mockReturnValueOnce('entraIntegrated')
+                .mockReturnValueOnce('MSIFailedConnection');
+
+            mockGetEndpointAuthorization.mockReturnValue({
+                scheme: 'ManagedServiceIdentity',
+                parameters: {}
+            });
+
+            mockExec.mockResolvedValueOnce(0);
+
+            await run();
+
+            expect(mockSetResult).toHaveBeenCalledWith(
+                tl.TaskResult.Failed,
+                expect.stringContaining('Failed to acquire Microsoft Entra ID token from Managed Identity')
+            );
+
+            spy.mockRestore();
+        });
+
+        it('should fail if token response does not contain access_token', async () => {
+            const { spy } = mockHttpResponse(200, JSON.stringify({
+                foo: 'bar'
+            }));
+
+            mockGetPathInput.mockReturnValueOnce('/path/to/test.dacpac');
+            mockGetInput
+                .mockReturnValueOnce('server')
+                .mockReturnValueOnce('')
+                .mockReturnValueOnce('myserver.database.windows.net')
+                .mockReturnValueOnce('mydb')
+                .mockReturnValueOnce('entraIntegrated')
+                .mockReturnValueOnce('NoTokenConnection');
+
+            mockGetEndpointAuthorization.mockReturnValue({
+                scheme: 'ServicePrincipal',
+                parameters: {
+                    tenantid: 't-id',
+                    serviceprincipalid: 'sp-id',
+                    serviceprincipalkey: 'key'
+                }
+            });
+
+            mockExec.mockResolvedValueOnce(0);
+
+            await run();
+
+            expect(mockSetResult).toHaveBeenCalledWith(
+                tl.TaskResult.Failed,
+                expect.stringContaining('Token endpoint response did not contain access_token')
+            );
+
+            spy.mockRestore();
+        });
+
+        it('should handle IMDS error response with JSON error_description', async () => {
+            const { spy } = mockHttpResponse(400, JSON.stringify({ error_description: 'IMDS failed' }), true);
+
+            mockGetEndpointAuthorizationScheme.mockReturnValue('ManagedServiceIdentity');
+
+            await expect(getEntraAccessToken('MSIConnection', 'myserver.database.windows.net'))
+                .rejects
+                .toThrow('Failed to acquire Microsoft Entra ID token from Managed Identity (HTTP 400): IMDS failed');
+
+            spy.mockRestore();
+        });
+
+        it('should handle IMDS 200 response missing access_token', async () => {
+            const { spy } = mockHttpResponse(200, JSON.stringify({ other_field: 'val' }), true);
+
+            mockGetEndpointAuthorizationScheme.mockReturnValue('ManagedServiceIdentity');
+
+            await expect(getEntraAccessToken('MSIConnection', 'myserver.database.windows.net'))
+                .rejects
+                .toThrow('Managed Identity response did not contain access_token');
+
+            spy.mockRestore();
         });
     });
 
@@ -636,6 +1206,119 @@ describe('SqlPackage Publisher Tests', () => {
             const input = '/v:ServiceAccount=$(executionAccount) /v:Group="$(securityGroup)"';
             const result = parseAdditionalArguments(input);
             expect(result).toEqual(['/v:ServiceAccount=$(executionAccount)', '/v:Group="$(securityGroup)"']);
+        });
+    });
+
+    describe('getSqlResourceForServer', () => {
+        it('should return default Azure SQL database resource for undefined server', () => {
+            const result = getSqlResourceForServer();
+            expect(result).toEqual({
+                resource: 'https://database.windows.net',
+                scope: 'https://database.windows.net/.default'
+            });
+        });
+
+        it('should return default Azure SQL database resource for commercial azure domain', () => {
+            const result = getSqlResourceForServer('myserver.database.windows.net');
+            expect(result).toEqual({
+                resource: 'https://database.windows.net',
+                scope: 'https://database.windows.net/.default'
+            });
+        });
+
+        it('should return US Gov cloud resource for usgovcloudapi domain', () => {
+            const result = getSqlResourceForServer('myserver.database.usgovcloudapi.net');
+            expect(result).toEqual({
+                resource: 'https://database.usgovcloudapi.net',
+                scope: 'https://database.usgovcloudapi.net/.default'
+            });
+        });
+
+        it('should return China cloud resource for chinacloudapi domain', () => {
+            const result = getSqlResourceForServer('myserver.database.chinacloudapi.cn');
+            expect(result).toEqual({
+                resource: 'https://database.chinacloudapi.cn',
+                scope: 'https://database.chinacloudapi.cn/.default'
+            });
+        });
+    });
+
+    describe('requestUrl', () => {
+        it('should handle successful https request with body', async () => {
+            const mockReq = new EventEmitter() as any;
+            mockReq.write = jest.fn();
+            mockReq.end = jest.fn();
+
+            const spy = (jest.spyOn(https, 'request') as any).mockImplementation((_url: any, _options: any, callback: any) => {
+                const mockRes = new EventEmitter() as any;
+                mockRes.statusCode = 200;
+
+                process.nextTick(() => {
+                    if (callback) callback(mockRes);
+                    mockRes.emit('data', 'response-data');
+                    mockRes.emit('end');
+                });
+
+                return mockReq;
+            });
+
+            const res = await requestUrl('https://login.microsoftonline.com/token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'test=1'
+            });
+
+            expect(res.statusCode).toBe(200);
+            expect(res.data).toBe('response-data');
+            expect(mockReq.write).toHaveBeenCalledWith('test=1');
+            expect(mockReq.end).toHaveBeenCalled();
+
+            spy.mockRestore();
+        });
+
+        it('should handle http request', async () => {
+            const mockReq = new EventEmitter() as any;
+            mockReq.write = jest.fn();
+            mockReq.end = jest.fn();
+
+            const spy = (jest.spyOn(http, 'request') as any).mockImplementation((_url: any, _options: any, callback: any) => {
+                const mockRes = new EventEmitter() as any;
+                mockRes.statusCode = 200;
+
+                process.nextTick(() => {
+                    if (callback) callback(mockRes);
+                    mockRes.emit('data', 'imds-data');
+                    mockRes.emit('end');
+                });
+
+                return mockReq;
+            });
+
+            const res = await requestUrl('http://169.254.169.254/metadata', {
+                method: 'GET'
+            });
+
+            expect(res.statusCode).toBe(200);
+            expect(res.data).toBe('imds-data');
+
+            spy.mockRestore();
+        });
+
+        it('should handle request network error', async () => {
+            const mockReq = new EventEmitter() as any;
+            mockReq.write = jest.fn();
+            mockReq.end = jest.fn();
+
+            const spy = (jest.spyOn(https, 'request') as any).mockImplementation((_url: any, _options: any, _callback: any) => {
+                process.nextTick(() => {
+                    mockReq.emit('error', new Error('Network error'));
+                });
+                return mockReq;
+            });
+
+            await expect(requestUrl('https://example.com', { method: 'GET' })).rejects.toThrow('Network error');
+
+            spy.mockRestore();
         });
     });
 });

@@ -82,6 +82,36 @@ Provide username and password:
     sqlPassword: '$(SqlPassword)'
 ```
 
+### "Azure Subscription / Service Connection is required for Entra Integrated authentication"
+
+**Cause:** Using `authenticationType: 'entraIntegrated'` without selecting an Azure subscription or service connection in `azureSubscription`.
+
+**Solution:**
+Specify an AzureRM service connection:
+```yaml
+- task: SqlPackagePublisher@0
+  inputs:
+    dacpacFile: '$(Build.SourcesDirectory)/Database.dacpac'
+    serverName: 'myserver.database.windows.net'
+    databaseName: 'MyDatabase'
+    authenticationType: 'entraIntegrated'
+    azureSubscription: 'MyAzureRMServiceConnection'
+```
+
+### "Failed to acquire Microsoft Entra ID token"
+
+**Cause:** The service principal credentials, workload identity federation token, or managed identity in the service connection could not acquire an access token for Azure SQL.
+
+**Solutions:**
+1. Verify the Azure service connection is valid and not expired in Project Settings > Service Connections.
+2. For Workload Identity Federation, ensure the OIDC federation subject and issuer match the Azure DevOps organization and project.
+3. Verify the Service Principal or Managed Identity has been created as an external user / role in Azure SQL Database:
+   ```sql
+   CREATE USER [your-service-principal-or-app-name] FROM EXTERNAL PROVIDER;
+   ALTER ROLE db_owner ADD MEMBER [your-service-principal-or-app-name];
+   ```
+4. Verify firewall rules on Azure SQL allow connections from the agent.
+
 ### "SqlPackage exited with code 1"
 
 **Cause:** SqlPackage deployment failed (various reasons).

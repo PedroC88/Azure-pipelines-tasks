@@ -28,7 +28,7 @@ steps:
     sqlPassword: '$(SqlPassword)'  # Use secret variable
 ```
 
-### Deploy with Azure AD Authentication
+### Deploy with Entra Integrated Authentication (Azure Service Connection)
 ```yaml
 steps:
 - task: SqlPackagePublisher@0
@@ -37,8 +37,11 @@ steps:
     targetMethod: 'server'
     serverName: 'myserver.database.windows.net'
     databaseName: 'MyDatabase'
-    authenticationType: 'azureActiveDirectory'
+    authenticationType: 'entraIntegrated'
+    azureSubscription: 'MyAzureRMServiceConnection'
 ```
+
+### Deploy with Azure AD Authentication (Integrated)
 
 ### Deploy with Connection String
 ```yaml
