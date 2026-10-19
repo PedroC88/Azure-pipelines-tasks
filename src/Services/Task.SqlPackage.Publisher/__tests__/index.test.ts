@@ -9,6 +9,8 @@ import { EventEmitter } from 'events';
 import {
     run,
     parseAdditionalArguments,
+    parseSqlCmdArguments,
+    parseSqlConnectionString,
     getEntraAccessToken,
     getSqlResourceForServer,
     requestUrl
@@ -1209,6 +1211,147 @@ describe('SqlPackage Publisher Tests', () => {
         });
     });
 
+    describe('SQL Script Deployment', () => {
+        it('parses sqlcmd arguments without passing shell quotes', () => {
+            expect(parseSqlCmdArguments('-v Name="A value" -t 300')).toEqual([
+                '-v',
+                'Name=A value',
+                '-t',
+                '300'
+            ]);
+        });
+
+        it('parses SQL connection strings with braced values', () => {
+            expect(parseSqlConnectionString(
+                'Server=myserver;Initial Catalog=mydb;User ID=sqluser;Password={p;ass};TrustServerCertificate=True'
+            )).toEqual({
+                server: 'myserver',
+                database: 'mydb',
+                username: 'sqluser',
+                password: 'p;ass',
+                authentication: undefined,
+                encrypt: undefined,
+                loginTimeout: undefined,
+                integratedSecurity: false,
+                trustServerCertificate: true
+            });
+        });
+
+        it('reports connection string options that sqlcmd cannot apply', () => {
+            expect(() => parseSqlConnectionString(
+                'Server=myserver;Database=mydb;MultipleActiveResultSets=True'
+            )).toThrow('SQL connection string options are not supported by sqlcmd: multipleactiveresultsets.');
+        });
+
+        it('runs a SQL file using sqlcmd arguments and credentials', async () => {
+            mockGetInput.mockImplementation((name: string) => ({
+                taskNameSelector: 'SqlTask',
+                targetMethod: 'server',
+                serverName: 'myserver',
+                databaseName: 'mydb',
+                authenticationType: 'sqlServerAuthentication',
+                sqlUsername: 'sqluser',
+                sqlPassword: 'sql-secret',
+                sqlAdditionalArguments: '-t 300'
+            }[name] || ''));
+            mockGetPathInput.mockImplementation((name: string) =>
+                name === 'sqlFile' ? '/scripts/**/*.sql' : '');
+            (tl.findMatch as jest.Mock).mockReturnValue(['/scripts/deploy.sql']);
+            (fs.statSync as jest.Mock).mockReturnValue({ isFile: () => true });
+
+            await run();
+
+            expect(mockExec).toHaveBeenCalledWith('sqlcmd', [
+                '-b',
+                '-S', 'myserver',
+                '-d', 'mydb',
+                '-U', 'sqluser',
+                '-i', '/scripts/deploy.sql',
+                '-t', '300'
+            ], expect.objectContaining({
+                env: expect.objectContaining({ SQLCMDPASSWORD: 'sql-secret' })
+            }));
+            expect(tl.findMatch).toHaveBeenCalledWith(process.cwd(), '/scripts/**/*.sql');
+            expect(mockSetSecret).toHaveBeenCalledWith('sql-secret');
+            expect(mockSetResult).toHaveBeenCalledWith(
+                tl.TaskResult.Succeeded,
+                'SQL script completed successfully'
+            );
+        });
+
+        it('runs inline SQL from a temporary file and parses a SQL connection string', async () => {
+            mockGetInput.mockImplementation((name: string) => ({
+                taskNameSelector: 'InlineSqlTask',
+                targetMethod: 'connectionString',
+                connectionString: 'Server=myserver;Database=mydb;User Id=sqluser;Password={p;ass};TrustServerCertificate=True',
+                sqlInline: 'CREATE TABLE test (id int);\nGO\n',
+                inlineAdditionalArguments: '--query-timeout 300'
+            }[name] || ''));
+            mockGetPathInput.mockReturnValue('');
+            (fs.mkdtempSync as jest.Mock).mockReturnValue('/tmp/sqlpackage-publisher-test');
+
+            await run();
+
+            expect(fs.writeFileSync).toHaveBeenCalledWith(
+                '/tmp/sqlpackage-publisher-test/inline.sql',
+                'CREATE TABLE test (id int);\nGO\n',
+                'utf8'
+            );
+            expect(mockExec).toHaveBeenCalledWith('sqlcmd', [
+                '-b',
+                '-S', 'myserver',
+                '-d', 'mydb',
+                '-C',
+                '-U', 'sqluser',
+                '-i', '/tmp/sqlpackage-publisher-test/inline.sql',
+                '--query-timeout', '300'
+            ], expect.objectContaining({
+                env: expect.objectContaining({ SQLCMDPASSWORD: 'p;ass' })
+            }));
+            expect(fs.rmSync).toHaveBeenCalledWith(
+                '/tmp/sqlpackage-publisher-test',
+                { recursive: true, force: true }
+            );
+        });
+
+        it('uses the go-sqlcmd authentication method with Entra service connections', async () => {
+            mockGetInput.mockImplementation((name: string) => ({
+                taskNameSelector: 'InlineSqlTask',
+                targetMethod: 'server',
+                serverName: 'myserver.database.windows.net',
+                databaseName: 'mydb',
+                authenticationType: 'entraIntegrated',
+                azureSubscription: 'service-connection',
+                sqlInline: 'SELECT 1;'
+            }[name] || ''));
+            mockGetPathInput.mockReturnValue('');
+            mockGetEndpointAuthorization.mockReturnValue({
+                scheme: 'ServicePrincipal',
+                parameters: {
+                    AccessToken: 'sql-access-token',
+                    serviceprincipalid: 'client-id',
+                    serviceprincipalkey: 'client-secret'
+                }
+            });
+            mockGetEndpointAuthorizationScheme.mockReturnValue('ServicePrincipal');
+            mockGetEndpointAuthorizationParameter.mockImplementation((_id: string, name: string) =>
+                name === 'serviceprincipalid' ? 'client-id' : undefined);
+            (fs.mkdtempSync as jest.Mock).mockReturnValue('/tmp/sqlpackage-publisher-test');
+
+            await run();
+
+            expect(mockExec).toHaveBeenCalledWith('sqlcmd', expect.arrayContaining([
+                '--authentication-method',
+                'ActiveDirectoryServicePrincipalAccessToken',
+                '-U',
+                'client-id'
+            ]), expect.objectContaining({
+                env: expect.objectContaining({ SQLCMDPASSWORD: 'sql-access-token' })
+            }));
+            expect(mockSetSecret).toHaveBeenCalledWith('sql-access-token');
+        });
+    });
+
     describe('getSqlResourceForServer', () => {
         it('should return default Azure SQL database resource for undefined server', () => {
             const result = getSqlResourceForServer();
@@ -1322,4 +1465,3 @@ describe('SqlPackage Publisher Tests', () => {
         });
     });
 });
-

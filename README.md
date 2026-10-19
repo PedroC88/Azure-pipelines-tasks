@@ -13,6 +13,8 @@ This extension uses the SqlPackage binary available in the session to publish a 
 
 This task can be used on systems without SqlPackage by using the companion installer task. It can also be used on systems with SqlPackage pre-installed as long as the executable is available on the session context (ej.: the PATH variable on Windows systems).
 
+The Publisher also supports running SQL script files or inline SQL through `sqlcmd`; install it first with [SqlCmd.Installer](src/Services/Task.SqlCmd.Installer/README.md). Existing DACPAC pipelines continue to use SqlPackage by default.
+
 ## SqlCmd.Installer
 This task installs Microsoft's cross-platform `sqlcmd` utility from the official go-sqlcmd releases and adds it to PATH for later steps in the same pipeline job. It supports Windows and Linux x64 and arm64 agents.
 

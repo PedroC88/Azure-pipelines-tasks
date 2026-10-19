@@ -1,5 +1,7 @@
 import * as tl from 'azure-pipelines-task-lib/task';
 import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import * as https from 'https';
 import * as http from 'http';
 import { URL } from 'url';
@@ -51,6 +53,155 @@ export function parseAdditionalArguments(input: string): string[] {
     }
 
     return args;
+}
+
+export function parseSqlCmdArguments(input: string): string[] {
+    const args: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    const normalized = input.split(/\r?\n/).map(line => line.trim()).filter(Boolean).join(' ');
+
+    for (let i = 0; i < normalized.length; i++) {
+        const char = normalized[i];
+        if (char === '\\' && normalized[i + 1] === '"') {
+            current += '"';
+            i++;
+        } else if (char === '"') {
+            inQuotes = !inQuotes;
+        } else if (char === ' ' && !inQuotes) {
+            if (current) {
+                args.push(current);
+                current = '';
+            }
+        } else {
+            current += char;
+        }
+    }
+
+    if (inQuotes) {
+        throw new Error('SQLCMD arguments contain an unmatched double quote.');
+    }
+    if (current) {
+        args.push(current);
+    }
+    return args;
+}
+
+interface SqlConnectionDetails {
+    server?: string;
+    database?: string;
+    username?: string;
+    password?: string;
+    authentication?: string;
+    encrypt?: string;
+    loginTimeout?: string;
+    integratedSecurity?: boolean;
+    trustServerCertificate?: boolean;
+}
+
+export function parseSqlConnectionString(connectionString: string): SqlConnectionDetails {
+    const values: Record<string, string> = {};
+    let position = 0;
+
+    while (position < connectionString.length) {
+        while (connectionString[position] === ';' || /\s/.test(connectionString[position] || '')) {
+            position++;
+        }
+        if (position >= connectionString.length) {
+            break;
+        }
+
+        const equalsIndex = connectionString.indexOf('=', position);
+        if (equalsIndex < 0) {
+            throw new Error('Invalid SQL connection string: a key/value pair is missing "=".');
+        }
+
+        const key = connectionString.slice(position, equalsIndex).trim().toLowerCase();
+        position = equalsIndex + 1;
+        let value = '';
+        const opening = connectionString[position];
+
+        if (opening === '{') {
+            position++;
+            let closed = false;
+            while (position < connectionString.length) {
+                if (connectionString[position] === '}' && connectionString[position + 1] === '}') {
+                    value += '}';
+                    position += 2;
+                } else if (connectionString[position] === '}') {
+                    position++;
+                    closed = true;
+                    break;
+                } else {
+                    value += connectionString[position++];
+                }
+            }
+            if (!closed) {
+                throw new Error('Invalid SQL connection string: a braced value is not closed.');
+            }
+        } else if (opening === '"' || opening === '\'') {
+            position++;
+            while (position < connectionString.length && connectionString[position] !== opening) {
+                value += connectionString[position++];
+            }
+            if (connectionString[position] !== opening) {
+                throw new Error('Invalid SQL connection string: a quoted value is not closed.');
+            }
+            position++;
+        } else {
+            const separator = connectionString.indexOf(';', position);
+            value = connectionString.slice(position, separator < 0 ? undefined : separator).trim();
+            position = separator < 0 ? connectionString.length : separator;
+        }
+
+        if (connectionString[position] === ';') {
+            position++;
+        }
+        if (key) {
+            values[key] = value;
+        }
+    }
+
+    const getValue = (...keys: string[]): string | undefined => {
+        for (const key of keys) {
+            if (values[key] !== undefined) {
+                return values[key];
+            }
+        }
+        return undefined;
+    };
+
+    const supportedKeys = new Set([
+        'server', 'data source', 'address', 'addr', 'network address',
+        'database', 'initial catalog',
+        'user id', 'uid', 'user',
+        'password', 'pwd',
+        'authentication',
+        'integrated security', 'trusted_connection',
+        'trustservercertificate',
+        'encrypt',
+        'connect timeout', 'connection timeout', 'login timeout'
+    ]);
+    const unsupportedKeys = Object.keys(values).filter(key => !supportedKeys.has(key));
+    if (unsupportedKeys.length > 0) {
+        throw new Error(`SQL connection string options are not supported by sqlcmd: ${unsupportedKeys.join(', ')}.`);
+    }
+
+    const integratedSecurity = getValue('integrated security', 'trusted_connection');
+    const trustServerCertificate = getValue('trustservercertificate');
+    const encrypt = getValue('encrypt');
+
+    return {
+        server: getValue('server', 'data source', 'address', 'addr', 'network address'),
+        database: getValue('database', 'initial catalog'),
+        username: getValue('user id', 'uid', 'user'),
+        password: getValue('password', 'pwd'),
+        authentication: getValue('authentication'),
+        encrypt,
+        loginTimeout: getValue('connect timeout', 'connection timeout', 'login timeout'),
+        integratedSecurity: ['true', 'yes', 'sspi'].includes(integratedSecurity?.toLowerCase() || ''),
+        trustServerCertificate: ['true', 'yes'].includes(trustServerCertificate?.toLowerCase() || '')
+    };
 }
 
 export function getSqlResourceForServer(serverName?: string): { resource: string; scope: string } {
@@ -244,13 +395,238 @@ export async function getEntraAccessToken(serviceConnection: string, serverName?
     return tokenData.access_token;
 }
 
+function getServicePrincipalId(serviceConnection: string): string | undefined {
+    const endpointAuth = tl.getEndpointAuthorization(serviceConnection, true);
+    return tl.getEndpointAuthorizationParameter(serviceConnection, 'serviceprincipalid', true) ||
+        tl.getEndpointDataParameter(serviceConnection, 'serviceprincipalid', true) ||
+        endpointAuth?.parameters?.['serviceprincipalid'];
+}
+
+async function addSqlCmdAuthentication(
+    args: string[],
+    environment: NodeJS.ProcessEnv,
+    authenticationType: string,
+    serverName: string,
+    targetMethod: string
+): Promise<void> {
+    delete environment.SQLCMDPASSWORD;
+    delete environment.SQLCMDUSER;
+
+    if (targetMethod === 'connectionString') {
+        const connectionString = tl.getInput('connectionString', true);
+        if (!connectionString) {
+            throw new Error('Connection string is required');
+        }
+        const details = parseSqlConnectionString(connectionString);
+        if (!details.server || !details.database) {
+            throw new Error('The SQL connection string must include a server and database.');
+        }
+
+        args.push('-S', details.server, '-d', details.database);
+        if (details.trustServerCertificate) {
+            args.push('-C');
+        }
+        if (details.encrypt) {
+            const encrypt = details.encrypt.toLowerCase();
+            const encryptionMode = ['true', 'yes'].includes(encrypt)
+                ? 'mandatory'
+                : ['false', 'no'].includes(encrypt) ? 'optional' : encrypt;
+            args.push('-N', encryptionMode);
+        }
+        if (details.loginTimeout) {
+            args.push('-l', details.loginTimeout);
+        }
+
+        const authMethod = details.authentication?.toLowerCase() || '';
+        if (authMethod.includes('active directory')) {
+            if (authMethod.includes('password')) {
+                if (!details.username || !details.password) {
+                    throw new Error('The connection string must include a user ID and password for Active Directory Password authentication.');
+                }
+                args.push('-G', '-U', details.username);
+                tl.setSecret(details.password);
+                environment.SQLCMDPASSWORD = details.password;
+            } else if (authMethod.includes('service principal')) {
+                if (!details.username || !details.password) {
+                    throw new Error('The connection string must include a client ID and password for Active Directory Service Principal authentication.');
+                }
+                args.push('--authentication-method', 'ActiveDirectoryServicePrincipal', '-U', details.username);
+                tl.setSecret(details.password);
+                environment.SQLCMDPASSWORD = details.password;
+            } else if (authMethod.includes('managed identity')) {
+                args.push('--authentication-method', 'ActiveDirectoryManagedIdentity');
+                if (details.username) {
+                    args.push('-U', details.username);
+                }
+            } else {
+                args.push('-G');
+                if (details.username) {
+                    args.push('-U', details.username);
+                }
+                if (details.password !== undefined) {
+                    tl.setSecret(details.password);
+                    environment.SQLCMDPASSWORD = details.password;
+                }
+            }
+        } else if (details.integratedSecurity) {
+            args.push('-E');
+        } else if (details.username) {
+            if (details.password === undefined) {
+                throw new Error('The SQL connection string must include a password when a user ID is specified.');
+            }
+            args.push('-U', details.username);
+            tl.setSecret(details.password);
+            environment.SQLCMDPASSWORD = details.password;
+        } else {
+            throw new Error('The SQL connection string must specify SQL credentials, integrated security, or an Active Directory authentication method.');
+        }
+        return;
+    }
+
+    if (targetMethod !== 'server') {
+        throw new Error(`Unsupported target connection method: ${targetMethod}`);
+    }
+
+    const databaseName = tl.getInput('databaseName', true);
+    if (!serverName || !databaseName) {
+        throw new Error('Server name and database name are required');
+    }
+    args.push('-S', serverName, '-d', databaseName);
+
+    if (authenticationType === 'windowsAuthentication') {
+        args.push('-E');
+    } else if (authenticationType === 'sqlServerAuthentication') {
+        const sqlUsername = tl.getInput('sqlUsername', true);
+        const sqlPassword = tl.getInput('sqlPassword', true);
+        if (!sqlUsername || !sqlPassword) {
+            throw new Error('SQL username and password are required for SQL Server authentication');
+        }
+        args.push('-U', sqlUsername);
+        tl.setSecret(sqlPassword);
+        environment.SQLCMDPASSWORD = sqlPassword;
+    } else if (authenticationType === 'azureActiveDirectory') {
+        args.push('-G');
+    } else if (authenticationType === 'entraIntegrated') {
+        const azureSubscription = tl.getInput('azureSubscription', false) ||
+            tl.getInput('azureServiceConnection', false) ||
+            tl.getInput('connectedServiceName', false);
+        if (!azureSubscription) {
+            throw new Error('Azure Subscription / Service Connection is required for Entra Integrated authentication');
+        }
+
+        const authScheme = tl.getEndpointAuthorizationScheme(azureSubscription, true) ||
+            tl.getEndpointAuthorization(azureSubscription, true)?.scheme;
+        if (authScheme === 'ManagedServiceIdentity') {
+            args.push('--authentication-method', 'ActiveDirectoryManagedIdentity');
+            const managedIdentityClientId =
+                tl.getEndpointAuthorizationParameter(azureSubscription, 'clientId', true) ||
+                tl.getEndpointAuthorizationParameter(azureSubscription, 'clientid', true) ||
+                tl.getEndpointDataParameter(azureSubscription, 'clientId', true);
+            if (managedIdentityClientId) {
+                args.push('-U', managedIdentityClientId);
+            }
+            return;
+        }
+
+        const servicePrincipalId = getServicePrincipalId(azureSubscription);
+        if (!servicePrincipalId) {
+            throw new Error('The service connection must provide a service principal ID to authenticate sqlcmd with Entra ID.');
+        }
+
+        const accessToken = await getEntraAccessToken(azureSubscription, serverName);
+        args.push('--authentication-method', 'ActiveDirectoryServicePrincipalAccessToken', '-U', servicePrincipalId);
+        environment.SQLCMDPASSWORD = accessToken;
+    } else {
+        throw new Error(`Unsupported authentication type: ${authenticationType}`);
+    }
+}
+
 export async function run() {
     try {
         // Get inputs
-        const dacpacFile = tl.getPathInput('dacpacFile', true, true);
+        const dacpacFile = tl.getPathInput('dacpacFile', false, true);
         const targetMethod = tl.getInput('targetMethod', true) || 'server';
         const publishProfile = tl.getPathInput('publishProfile', false);
         const additionalArguments = tl.getInput('additionalArguments', false) || '';
+        const requestedTaskType = dacpacFile ? 'DacpacTask' : tl.getInput('taskNameSelector', false);
+        const taskNameSelector = requestedTaskType === 'SqlTask' || requestedTaskType === 'InlineSqlTask'
+            ? requestedTaskType
+            : 'DacpacTask';
+
+        if (taskNameSelector === 'SqlTask' || taskNameSelector === 'InlineSqlTask') {
+            const serverName = targetMethod === 'server' ? tl.getInput('serverName', false) || '' : '';
+            const authenticationType = tl.getInput('authenticationType', false) || 'windowsAuthentication';
+            const scriptPattern = taskNameSelector === 'SqlTask' ? tl.getPathInput('sqlFile', true, false) : '';
+            const inlineSql = taskNameSelector === 'InlineSqlTask' ? tl.getInput('sqlInline', false) || '' : '';
+            const scriptArguments = tl.getInput(
+                taskNameSelector === 'SqlTask' ? 'sqlAdditionalArguments' : 'inlineAdditionalArguments',
+                false
+            ) || '';
+
+            let inputFile = '';
+            let scriptPath = '';
+            let temporaryDirectory: string | undefined;
+            try {
+                if (taskNameSelector === 'SqlTask') {
+                    if (!scriptPattern) {
+                        throw new Error('SQL script file path is required');
+                    }
+                    const matches = tl.findMatch(
+                        tl.getVariable('System.DefaultWorkingDirectory') || process.cwd(),
+                        scriptPattern
+                    );
+                    if (matches.length === 0) {
+                        throw new Error(`No SQL script files matched: ${scriptPattern}`);
+                    }
+                    if (matches.length > 1) {
+                        throw new Error(`More than one SQL script file matched: ${scriptPattern}`);
+                    }
+                    scriptPath = matches[0];
+                    if (!fs.existsSync(scriptPath) || !fs.statSync(scriptPath).isFile()) {
+                        throw new Error(`SQL script file not found: ${scriptPath}`);
+                    }
+                    if (path.extname(scriptPath).toLowerCase() !== '.sql') {
+                        throw new Error(`SQL script file must have a .sql extension: ${scriptPath}`);
+                    }
+                    inputFile = scriptPath;
+                } else {
+                    if (!inlineSql.trim()) {
+                        throw new Error('Inline SQL script is required');
+                    }
+                    temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'sqlpackage-publisher-'));
+                    inputFile = path.join(temporaryDirectory, 'inline.sql');
+                    fs.writeFileSync(inputFile, inlineSql, 'utf8');
+                }
+
+                const environment: NodeJS.ProcessEnv = { ...process.env };
+                const args: string[] = ['-b'];
+                await addSqlCmdAuthentication(args, environment, authenticationType, serverName, targetMethod);
+                args.push('-i', inputFile);
+                args.push(...parseSqlCmdArguments(scriptArguments));
+
+                try {
+                    await tl.exec('sqlcmd', ['--version']);
+                } catch {
+                    throw new Error('SqlCmd not found in PATH. Please run the SqlCmd Installer task first.');
+                }
+
+                console.log(taskNameSelector === 'SqlTask'
+                    ? `Executing SQL script file: ${scriptPath}`
+                    : 'Executing inline SQL script...');
+                const result = await tl.exec('sqlcmd', args, { env: environment });
+                if (result !== 0) {
+                    throw new Error(`SqlCmd exited with code ${result}`);
+                }
+
+                console.log('SQL script completed successfully');
+                tl.setResult(tl.TaskResult.Succeeded, 'SQL script completed successfully');
+            } finally {
+                if (temporaryDirectory) {
+                    fs.rmSync(temporaryDirectory, { recursive: true, force: true });
+                }
+            }
+            return;
+        }
 
         if (!dacpacFile) {
             throw new Error('DACPAC file path is required');

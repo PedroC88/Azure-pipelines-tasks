@@ -2,6 +2,53 @@
 
 ## Basic Usage
 
+### Execute a SQL Script File
+
+```yaml
+steps:
+- task: SqlCmdInstaller@1
+  inputs:
+    versionSpec: latest
+
+- task: SqlPackagePublisher@1
+  inputs:
+    taskNameSelector: SqlTask
+    sqlFile: '$(Build.SourcesDirectory)/Database/seed.sql'
+    serverName: '$(DatabaseServer)'
+    databaseName: '$(DatabaseName)'
+    authenticationType: 'sqlServerAuthentication'
+    sqlUsername: '$(SqlUser)'
+    sqlPassword: '$(SqlPassword)'
+    sqlAdditionalArguments: '-t 300'
+```
+
+### Execute Inline SQL
+
+```yaml
+steps:
+- task: SqlCmdInstaller@1
+  inputs:
+    versionSpec: latest
+
+- task: SqlPackagePublisher@1
+  inputs:
+    taskNameSelector: InlineSqlTask
+    sqlInline: |
+      IF OBJECT_ID('dbo.SeedStatus') IS NULL
+      BEGIN
+        CREATE TABLE dbo.SeedStatus (Id int NOT NULL);
+      END
+      GO
+    serverName: '$(DatabaseServer)'
+    databaseName: '$(DatabaseName)'
+    authenticationType: 'sqlServerAuthentication'
+    sqlUsername: '$(SqlUser)'
+    sqlPassword: '$(SqlPassword)'
+    inlineAdditionalArguments: '-t 300'
+```
+
+SQL script modes require `sqlcmd` on PATH, for example via `SqlCmdInstaller@1`. The script-specific argument inputs use sqlcmd options; the existing `additionalArguments` input remains for SqlPackage DACPAC deployments.
+
 ### Deploy with Windows Authentication
 ```yaml
 steps:

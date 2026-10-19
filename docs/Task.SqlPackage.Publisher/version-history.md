@@ -20,6 +20,14 @@
 - Detailed error messages
 - Integration with SqlPackage Installer task
 
+## v1.2.0
+
+### Added
+- SQL script file and inline SQL deployment modes using sqlcmd
+- SQLCMD-specific additional arguments, separate from SqlPackage arguments
+- SQL Server authentication, trusted connections, Entra authentication, and common SQL connection-string support for scripts
+- SqlCmd Installer requirement and script deployment examples
+
 ### Technical Details
 - Node.js 20 runtime
 - TypeScript 5.7.2
