@@ -12,3 +12,14 @@ Installing this extension **DOES NOT** make SqlPackage available for the Microso
 This extension uses the SqlPackage binary available in the session to publish a DacPac from the console, the task has an UI and yaml parameters similar to Microsoft Sql Deployment task to make it easy to transition from that task to this one, however they don't work the same.
 
 This task can be used on systems without SqlPackage by using the companion installer task. It can also be used on systems with SqlPackage pre-installed as long as the executable is available on the session context (ej.: the PATH variable on Windows systems).
+
+## SqlCmd.Installer
+This task installs Microsoft's cross-platform `sqlcmd` utility from the official go-sqlcmd releases and adds it to PATH for later steps in the same pipeline job. It supports Windows and Linux x64 and arm64 agents.
+
+```yaml
+- task: SqlCmdInstaller@1
+  inputs:
+    versionSpec: 'latest'
+```
+
+Use `versionSpec` to select the latest stable release, a major/minor line (for example `1.10`), or an exact version. See [the SqlCmd Installer README](src/Services/Task.SqlCmd.Installer/README.md) for inputs and details.

@@ -1,0 +1,70 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Microsoft/azure-pipelines-task-lib/master/tasks.schema.json",
+  "id": "c7a2b731-6d44-4f53-8b09-2b0b8c3c9c10",
+  "name": "SqlCmdInstaller",
+  "friendlyName": "SqlCmd Installer",
+  "description": "Installs a specific version of Microsoft's cross-platform sqlcmd utility and adds it to the PATH.",
+  "helpMarkDown": "[More information](https://learn.microsoft.com/en-us/sql/tools/sqlcmd/sqlcmd-download-install)",
+  "category": "Tool",
+  "author": "PedroC88",
+  "icon": "icon.png",
+  "version": {
+    "Major": 1,
+    "Minor": 0,
+    "Patch": 0
+  },
+  "minimumAgentVersion": "2.144.0",
+  "instanceNameFormat": "Use SqlCmd $(versionSpec)",
+  "groups": [
+    {
+      "name": "advanced",
+      "displayName": "Advanced",
+      "isExpanded": false
+    }
+  ],
+  "inputs": [
+    {
+      "name": "versionSpec",
+      "type": "string",
+      "label": "Version Spec",
+      "defaultValue": "latest",
+      "required": true,
+      "helpMarkDown": "Version range or exact version of sqlcmd to use. Use 'latest' for the most recent stable release."
+    },
+    {
+      "name": "checkLatest",
+      "type": "boolean",
+      "label": "Check for Latest Version",
+      "defaultValue": "false",
+      "required": false,
+      "helpMarkDown": "Select this option to check online for the latest release that satisfies the version spec.",
+      "groupName": "advanced"
+    },
+    {
+      "name": "installDirectory",
+      "type": "string",
+      "label": "Install Directory",
+      "defaultValue": "",
+      "required": false,
+      "helpMarkDown": "Specify where sqlcmd will be installed. If not specified, sqlcmd will be installed to a directory under the tools cache.",
+      "groupName": "advanced"
+    }
+  ],
+  "execution": {
+    "Node10": {
+      "target": "index.js"
+    },
+    "Node16": {
+      "target": "index.js"
+    },
+    "Node20_1": {
+      "target": "index.js"
+    }
+  },
+  "messages": {
+    "VersionNotFound": "SqlCmd version '%s' not found for this platform and architecture.",
+    "DownloadingVersion": "Downloading SqlCmd version '%s'.",
+    "ExtractingPackage": "Extracting downloaded package.",
+    "SuccessfullyInstalled": "SqlCmd version '%s' has been installed successfully."
+  }
+}

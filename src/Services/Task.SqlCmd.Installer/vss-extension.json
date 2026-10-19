@@ -1,0 +1,68 @@
+{
+  "manifestVersion": 1,
+  "id": "sqlcmd-installer",
+  "name": "SqlCmd Installer",
+  "version": "1.0.0",
+  "publisher": "PedroC88",
+  "targets": [
+    {
+      "id": "Microsoft.VisualStudio.Services"
+    }
+  ],
+  "description": "Installs Microsoft's cross-platform sqlcmd utility and adds it to the PATH for Azure Pipelines.",
+  "categories": [
+    "Azure Pipelines"
+  ],
+  "tags": [
+    "Build",
+    "Release",
+    "Database",
+    "SqlCmd",
+    "Tool Installer"
+  ],
+  "content": {
+    "details": {
+      "path": "overview.md"
+    }
+  },
+  "links": {
+    "getstarted": {
+      "uri": "https://github.com/PedroC88/Azure-pipelines-tasks"
+    },
+    "support": {
+      "uri": "https://github.com/PedroC88/Azure-pipelines-tasks/issues"
+    }
+  },
+  "branding": {
+    "color": "rgb(0, 120, 212)",
+    "theme": "light"
+  },
+  "icons": {
+    "default": "icon.png"
+  },
+  "files": [
+    {
+      "path": "SqlCmdInstaller"
+    },
+    {
+      "path": "overview.md",
+      "addressable": true
+    },
+    {
+      "path": "icon.png",
+      "addressable": true
+    }
+  ],
+  "contributions": [
+    {
+      "id": "sqlcmd-installer-task",
+      "type": "ms.vss-distributed-task.task",
+      "targets": [
+        "ms.vss-distributed-task.tasks"
+      ],
+      "properties": {
+        "name": "SqlCmdInstaller"
+      }
+    }
+  ]
+}
