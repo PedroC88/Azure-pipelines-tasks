@@ -8,7 +8,7 @@ This task is intended to be used with the [SqlPackage Publisher](https://marketp
 
 ## 📄 License
 
-Custom non-commercial license - free for personal use. See [LICENSE](https://github.com/PedroC88/Azure-pipelines-tasks/blob/develop/LICENSE) for details.
+MIT License. See [LICENSE](https://github.com/PedroC88/Azure-pipelines-tasks/blob/develop/LICENSE) for details.
 
 ## 🚀 Quick Start
 

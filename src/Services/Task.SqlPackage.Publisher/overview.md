@@ -1,10 +1,10 @@
 # SqlPackage Publisher for Azure Pipelines
 
-Deploy SQL Server DACPAC files using SqlPackage command-line utility. Cross-platform support for Windows, Linux, and macOS agents.
+Deploy SQL Server DACPAC files using SqlPackage or run SQL scripts with sqlcmd. Cross-platform support for Windows, Linux, and macOS agents.
 
 ## 📄 License
 
-Custom non-commercial license - free for personal use. See [LICENSE](https://github.com/PedroC88/Azure-pipelines-tasks/blob/develop/LICENSE) for details.
+MIT License. See [LICENSE](https://github.com/PedroC88/Azure-pipelines-tasks/blob/develop/LICENSE) for details.
 
 ## 🚀 Quick Start
 
@@ -30,12 +30,16 @@ Custom non-commercial license - free for personal use. See [LICENSE](https://git
 - **Publish Profiles** - Support for XML publish profile files
 - **Connection Strings** - Direct connection string support
 - **Flexible Configuration** - Additional SqlPackage arguments support
+- **SQL Scripts** - Run `.sql` files or inline SQL using sqlcmd
 
 ## 📋 Parameters
 
 | Parameter | Description | Required | Default |
 |-----------|-------------|----------|---------|
-| `dacpacFile` | Path to the DACPAC file | ✅ | - |
+| `dacpacFile` | Path to the DACPAC file | Yes (DACPAC mode) | - |
+| `taskNameSelector` | Deployment type: `DacpacTask`, `SqlTask`, or `InlineSqlTask` | ✅ | `DacpacTask` |
+| `sqlFile` | `.sql` file to execute when `taskNameSelector` is `SqlTask` | Yes (SQL file mode) | - |
+| `sqlInline` | Inline SQL to execute when `taskNameSelector` is `InlineSqlTask` | Yes (inline mode) | - |
 | `targetMethod` | Connection method: server or connectionString | ✅ | server |
 | `serverName` | SQL Server name or address | ✅ (if server) | - |
 | `databaseName` | Target database name | ✅ (if server) | - |
@@ -46,8 +50,54 @@ Custom non-commercial license - free for personal use. See [LICENSE](https://git
 | `connectionString` | Full connection string | ✅ (if connectionString) | - |
 | `publishProfile` | Path to .publish.xml profile | ❌ | - |
 | `additionalArguments` | Extra SqlPackage arguments | ❌ | - |
+| `sqlAdditionalArguments` | Extra sqlcmd arguments for a script file | ❌ | - |
+| `inlineAdditionalArguments` | Extra sqlcmd arguments for inline SQL | ❌ | - |
 
 ## 📖 Usage Examples
+
+### Run a SQL Script File
+
+Install sqlcmd with the companion task before selecting SQL script mode:
+
+```yaml
+- task: SqlCmdInstaller@1
+  inputs:
+    versionSpec: latest
+
+- task: SqlPackagePublisher@1
+  inputs:
+    taskNameSelector: SqlTask
+    sqlFile: '$(Build.SourcesDirectory)/Database/seed.sql'
+    serverName: '$(SqlServer)'
+    databaseName: '$(DatabaseName)'
+    authenticationType: sqlServerAuthentication
+    sqlUsername: '$(SqlUser)'
+    sqlPassword: '$(SqlPassword)'
+    sqlAdditionalArguments: '-t 300'
+```
+
+### Run Inline SQL
+
+```yaml
+- task: SqlCmdInstaller@1
+  inputs:
+    versionSpec: latest
+
+- task: SqlPackagePublisher@1
+  inputs:
+    taskNameSelector: InlineSqlTask
+    sqlInline: |
+      SELECT @@VERSION;
+      GO
+    serverName: '$(SqlServer)'
+    databaseName: '$(DatabaseName)'
+    authenticationType: sqlServerAuthentication
+    sqlUsername: '$(SqlUser)'
+    sqlPassword: '$(SqlPassword)'
+    inlineAdditionalArguments: '-t 300'
+```
+
+Script modes execute through sqlcmd and accept sqlcmd-specific arguments. DACPAC deployments remain the default and continue to use SqlPackage-specific `additionalArguments`.
 
 ### Entra Integrated Authentication (Azure Service Connection)
 

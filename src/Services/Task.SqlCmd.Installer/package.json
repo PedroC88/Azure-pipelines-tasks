@@ -1,0 +1,44 @@
+{
+  "name": "sqlcmd-installer",
+  "version": "1.0.0",
+  "description": "Installs Microsoft's cross-platform sqlcmd utility in Azure Pipelines",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint .",
+    "test": "jest",
+    "test:coverage": "jest --coverage",
+    "prepare-minimal": "powershell -ExecutionPolicy Bypass -File prepare-minimal.ps1",
+    "restore-modules": "powershell -ExecutionPolicy Bypass -File restore-modules.ps1",
+    "prepackage": "npm run build && npm run prepare-minimal",
+    "postpackage": "npm run restore-modules",
+    "package": "npx tfx-cli extension create --manifest-globs vss-extension.json --output-path ."
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PedroC88/Azure-pipelines-tasks.git"
+  },
+  "keywords": [
+    "azure-devops",
+    "sqlcmd",
+    "tool-installer"
+  ],
+  "author": "PedroC88",
+  "license": "MIT",
+  "dependencies": {
+    "azure-pipelines-task-lib": "^5.2.4",
+    "azure-pipelines-tool-lib": "^2.0.10"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^20.0.0",
+    "eslint": "^9.17.0",
+    "jest": "^30.2.0",
+    "rimraf": "^6.0.1",
+    "tfx-cli": "^0.22.6",
+    "ts-jest": "^29.2.5",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.19.1"
+  }
+}

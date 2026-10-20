@@ -1,0 +1,95 @@
+name: CD - SqlCmd Installer
+
+# Publishes the VSIX built by the matching CI workflow to the Marketplace
+# and creates the GitHub release from it.
+# It never runs for pull request builds.
+on:
+  workflow_run:
+    workflows: ['CI - SqlCmd Installer']
+    types: [completed]
+    branches:
+      - develop
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'ID of a successful, non pull request CI run whose VSIX should be published'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    if: >-
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push') ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/develop')
+    env:
+      RUN_ID: ${{ github.event.workflow_run.id || inputs.run_id }}
+
+    steps:
+    - name: Verify CI run is not a pull request run
+      shell: pwsh
+      run: |
+        $event = gh run view $env:RUN_ID --repo "${{ github.repository }}" --json event,workflowName,conclusion --jq '.event + "|" + .workflowName + "|" + .conclusion'
+        if ($LASTEXITCODE -ne 0) { echo "::error::Unable to read CI run $env:RUN_ID"; exit 1 }
+        $parts = $event -split '\|'
+        if ($parts[0] -eq 'pull_request') { echo "::error::Run $env:RUN_ID is a pull request run - publishing is not allowed"; exit 1 }
+        if ($parts[1] -ne 'CI - SqlCmd Installer') { echo "::error::Run $env:RUN_ID belongs to workflow '$($parts[1])', not 'CI - SqlCmd Installer'"; exit 1 }
+        if ($parts[2] -ne 'success') { echo "::error::Run $env:RUN_ID did not succeed"; exit 1 }
+      env:
+        GH_TOKEN: ${{ github.token }}
+
+    - name: Download CI artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: sqlcmd-installer-vsix-package
+        run-id: ${{ env.RUN_ID }}
+        github-token: ${{ github.token }}
+
+    - name: Publish to Marketplace
+      env:
+        AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+      run: |
+        if ([string]::IsNullOrEmpty($env:AZURE_DEVOPS_PAT)) {
+          echo "::error::AZURE_DEVOPS_PAT secret is not configured. Please add it to repository secrets."
+          echo "::error::Visit: https://github.com/${{ github.repository }}/settings/secrets/actions"
+          exit 1
+        }
+        echo "::notice::Publishing SqlCmd Installer extension to Azure DevOps Marketplace..."
+        npx tfx-cli extension publish --vsix (Get-ChildItem -Filter *.vsix | Select-Object -First 1).Name --token $env:AZURE_DEVOPS_PAT --no-prompt
+        if ($LASTEXITCODE -ne 0) {
+          echo "::error::Failed to publish SqlCmd Installer extension to marketplace"
+          exit 1
+        }
+        echo "::notice::Successfully published SqlCmd Installer to marketplace"
+      shell: pwsh
+
+    - name: Read version
+      id: get_version
+      shell: pwsh
+      run: |
+        $version = (Get-Content release-version.txt -Raw).Trim()
+        echo "version=$version" >> $env:GITHUB_OUTPUT
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: sqlcmd-installer-v${{ steps.get_version.outputs.version }}
+        name: SqlCmd Installer v${{ steps.get_version.outputs.version }}
+        target_commitish: ${{ github.event.workflow_run.head_sha || github.sha }}
+        body: |
+          Automated release of SqlCmd Installer from develop branch
+
+          Extension version: ${{ steps.get_version.outputs.version }}
+
+          This extension installs sqlcmd and adds it to the PATH for use in subsequent pipeline steps.
+        files: '*.vsix'
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

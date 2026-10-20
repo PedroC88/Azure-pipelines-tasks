@@ -3,25 +3,57 @@
   "id": "f8a9c2d1-4e3b-4c5a-9d8f-2e1b3c4d5e6f",
   "name": "SqlPackagePublisher",
   "friendlyName": "SqlPackage Publisher",
-  "description": "Deploy SQL Server dacpac files using SqlPackage",
+  "description": "Deploy SQL Server DACPAC files using SqlPackage or execute SQL script files and inline SQL using sqlcmd.",
   "helpMarkDown": "[More information](https://docs.microsoft.com/en-us/sql/tools/sqlpackage)",
   "category": "Deploy",
   "author": "PedroC88",
   "icon": "icon.png",
   "version": {
     "Major": 1,
-    "Minor": 1,
+    "Minor": 2,
     "Patch": 0
   },
   "instanceNameFormat": "Deploy $(dacpacFile) to $(databaseName)",
   "inputs": [
+    {
+      "name": "taskNameSelector",
+      "type": "pickList",
+      "label": "Deployment Type",
+      "defaultValue": "DacpacTask",
+      "required": true,
+      "helpMarkDown": "Select a DACPAC deployment, SQL script file, or inline SQL script.",
+      "options": {
+        "DacpacTask": "SQL DACPAC File",
+        "SqlTask": "SQL Script File",
+        "InlineSqlTask": "Inline SQL Script"
+      }
+    },
     {
       "name": "dacpacFile",
       "type": "filePath",
       "label": "DACPAC File",
       "defaultValue": "",
       "required": true,
-      "helpMarkDown": "Path to the DACPAC file. Can include wildcards and variables like $(System.DefaultWorkingDirectory)/**/*.dacpac"
+      "helpMarkDown": "Path to the DACPAC file.",
+      "visibleRule": "taskNameSelector = DacpacTask"
+    },
+    {
+      "name": "sqlFile",
+      "type": "filePath",
+      "label": "SQL Script File",
+      "defaultValue": "",
+      "required": true,
+      "helpMarkDown": "Path or pattern for a .sql script file to execute using sqlcmd. The pattern must resolve to exactly one file.",
+      "visibleRule": "taskNameSelector = SqlTask"
+    },
+    {
+      "name": "sqlInline",
+      "type": "multiLine",
+      "label": "Inline SQL Script",
+      "defaultValue": "",
+      "required": true,
+      "helpMarkDown": "SQL script to execute using sqlcmd. Multi-batch scripts may use GO.",
+      "visibleRule": "taskNameSelector = InlineSqlTask"
     },
     {
       "name": "targetMethod",
@@ -101,7 +133,7 @@
       "label": "Connection String",
       "defaultValue": "",
       "required": true,
-      "helpMarkDown": "Full SQL Server connection string",
+      "helpMarkDown": "Full SQL Server connection string. In script modes, sqlcmd supports server, database, user, password, authentication, encrypt, login timeout, and TrustServerCertificate options.",
       "visibleRule": "targetMethod = connectionString"
     },
     {
@@ -110,7 +142,8 @@
       "label": "Publish Profile",
       "defaultValue": "",
       "required": false,
-      "helpMarkDown": "Optional: Path to a publish profile XML file (.publish.xml) with deployment settings"
+      "helpMarkDown": "Optional: Path to a publish profile XML file (.publish.xml) with deployment settings",
+      "visibleRule": "taskNameSelector = DacpacTask"
     },
     {
       "name": "additionalArguments",
@@ -118,7 +151,26 @@
       "label": "Additional Arguments",
       "defaultValue": "",
       "required": false,
-      "helpMarkDown": "Additional SqlPackage.exe arguments. Example: /p:BlockOnPossibleDataLoss=false /p:DropObjectsNotInSource=true"
+      "helpMarkDown": "Additional SqlPackage arguments. Example: /p:BlockOnPossibleDataLoss=false /p:DropObjectsNotInSource=true",
+      "visibleRule": "taskNameSelector = DacpacTask"
+    },
+    {
+      "name": "sqlAdditionalArguments",
+      "type": "multiLine",
+      "label": "SQLCMD Additional Arguments",
+      "defaultValue": "",
+      "required": false,
+      "helpMarkDown": "Additional sqlcmd command-line arguments, for example: -v Environment=Test or -t 300.",
+      "visibleRule": "taskNameSelector = SqlTask"
+    },
+    {
+      "name": "inlineAdditionalArguments",
+      "type": "multiLine",
+      "label": "SQLCMD Additional Arguments",
+      "defaultValue": "",
+      "required": false,
+      "helpMarkDown": "Additional sqlcmd command-line arguments, for example: -v Environment=Test or -t 300.",
+      "visibleRule": "taskNameSelector = InlineSqlTask"
     }
   ],
   "execution": {

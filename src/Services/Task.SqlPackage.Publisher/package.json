@@ -16,7 +16,7 @@
     "postpackage": "npm run restore-modules"
   },
   "author": "PedroC88",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "dependencies": {
     "azure-pipelines-task-lib": "^5.2.4"
   },

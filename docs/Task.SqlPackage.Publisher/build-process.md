@@ -139,16 +139,23 @@ After packaging, upload the `.vsix` file to Azure DevOps:
 
 ### GitHub Actions Workflow
 
-The project includes `publish-publisher.yml` workflow that:
-1. Triggers on changes to `src/Services/Task.SqlPackage.Publisher/**`
-2. Runs lint, tests, and builds on every push to develop
-3. Creates VSIX package
-4. Publishes to Azure DevOps Marketplace (on version change)
-5. Creates GitHub release
+The pipeline is split into two workflows:
 
-### Manual Workflow Trigger
+**CI** (`.github/workflows/ci-publisher.yml`)
+1. Triggers on changes to `src/Services/Task.SqlPackage.Publisher/**` (push to develop, pull requests, manual)
+2. Runs lint, tests, and builds the VSIX package
+3. Always uploads the VSIX (plus its version) as a workflow artifact, including for pull requests
+4. Never publishes or creates releases
 
-Workflow can be triggered manually with `force_publish` option to publish even if version hasn't changed.
+**CD** (`.github/workflows/cd-publisher.yml`)
+1. Triggers when the CI workflow completes successfully on develop; it never runs for pull request builds
+2. Downloads the VSIX artifact from that CI run (it does not rebuild)
+3. Publishes to the Azure DevOps Marketplace
+4. Creates the GitHub release for the extension version
+
+### Manual CD Trigger
+
+CD can be started manually (from `develop`) with the `run_id` of a successful, non pull request CI run to publish that run's VSIX.
 
 ## Troubleshooting
 
