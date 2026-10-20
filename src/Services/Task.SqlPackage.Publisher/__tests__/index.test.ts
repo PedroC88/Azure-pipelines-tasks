@@ -2,6 +2,7 @@
 process.env.NODE_ENV = 'test';
 
 import * as tl from 'azure-pipelines-task-lib/task';
+import * as path from 'path';
 import * as fs from 'fs';
 import * as https from 'https';
 import * as http from 'http';
@@ -1293,7 +1294,7 @@ describe('SqlPackage Publisher Tests', () => {
             await run();
 
             expect(fs.writeFileSync).toHaveBeenCalledWith(
-                '/tmp/sqlpackage-publisher-test/inline.sql',
+                path.join('/tmp/sqlpackage-publisher-test', 'inline.sql'),
                 'CREATE TABLE test (id int);\nGO\n',
                 'utf8'
             );
@@ -1303,7 +1304,7 @@ describe('SqlPackage Publisher Tests', () => {
                 '-d', 'mydb',
                 '-C',
                 '-U', 'sqluser',
-                '-i', '/tmp/sqlpackage-publisher-test/inline.sql',
+                '-i', path.join('/tmp/sqlpackage-publisher-test', 'inline.sql'),
                 '--query-timeout', '300'
             ], expect.objectContaining({
                 env: expect.objectContaining({ SQLCMDPASSWORD: 'p;ass' })
