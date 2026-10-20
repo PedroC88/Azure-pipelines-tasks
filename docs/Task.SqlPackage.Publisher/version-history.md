@@ -20,7 +20,7 @@
 - Detailed error messages
 - Integration with SqlPackage Installer task
 
-## v1.2.0
+## v1.3.0
 
 ### Added
 - SQL script file and inline SQL deployment modes using sqlcmd
