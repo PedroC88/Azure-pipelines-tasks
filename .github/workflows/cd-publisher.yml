@@ -1,8 +1,8 @@
 name: CD - SqlPackage Publisher
 
-# Publishes the VSIX built by the matching CI workflow to the Marketplace
-# and creates the GitHub release from it. Afterwards the minor version is bumped
-# on develop so the next run publishes a new version.
+# Creates the GitHub release from the VSIX built by the matching CI workflow, then publishes
+# that same VSIX to the Marketplace. Afterwards the minor version is bumped on develop
+# so the next run publishes a new version.
 # It never runs for pull request builds.
 on:
   workflow_run:
@@ -58,24 +58,6 @@ jobs:
         run-id: ${{ env.RUN_ID }}
         github-token: ${{ github.token }}
 
-    - name: Publish to Marketplace
-      env:
-        AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
-      run: |
-        if ([string]::IsNullOrEmpty($env:AZURE_DEVOPS_PAT)) {
-          echo "::error::AZURE_DEVOPS_PAT secret is not configured. Please add it to repository secrets."
-          echo "::error::Visit: https://github.com/${{ github.repository }}/settings/secrets/actions"
-          exit 1
-        }
-        echo "::notice::Publishing SqlPackage Publisher extension to Azure DevOps Marketplace..."
-        npx tfx-cli extension publish --vsix (Get-ChildItem -Filter *.vsix | Select-Object -First 1).Name --token $env:AZURE_DEVOPS_PAT --no-prompt --no-wait-validation
-        if ($LASTEXITCODE -ne 0) {
-          echo "::error::Failed to publish SqlPackage Publisher extension to marketplace"
-          exit 1
-        }
-        echo "::notice::Uploaded SqlPackage Publisher to marketplace; validation continues in the validate job"
-      shell: pwsh
-
     - name: Read version
       id: get_version
       shell: pwsh
@@ -100,6 +82,24 @@ jobs:
         prerelease: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Publish to Marketplace
+      env:
+        AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+      run: |
+        if ([string]::IsNullOrEmpty($env:AZURE_DEVOPS_PAT)) {
+          echo "::error::AZURE_DEVOPS_PAT secret is not configured. Please add it to repository secrets."
+          echo "::error::Visit: https://github.com/${{ github.repository }}/settings/secrets/actions"
+          exit 1
+        }
+        echo "::notice::Publishing SqlPackage Publisher extension to Azure DevOps Marketplace..."
+        npx tfx-cli extension publish --vsix (Get-ChildItem -Filter *.vsix | Select-Object -First 1).Name --token $env:AZURE_DEVOPS_PAT --no-prompt --no-wait-validation
+        if ($LASTEXITCODE -ne 0) {
+          echo "::error::Failed to publish SqlPackage Publisher extension to marketplace"
+          exit 1
+        }
+        echo "::notice::Uploaded SqlPackage Publisher to marketplace; validation continues in the validate job"
+      shell: pwsh
 
   # The Marketplace validates uploads asynchronously and can take a long time, so publishing does not wait for it.
   # A rejected extension fails this job; a validation that is still pending after the timeout only warns.
