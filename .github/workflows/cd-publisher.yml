@@ -1,8 +1,8 @@
 name: CD - SqlPackage Publisher
 
-# Publishes the VSIX built by the matching CI workflow to the Marketplace
-# and creates the GitHub release from it. Afterwards the minor version is bumped
-# on develop so the next run publishes a new version.
+# Creates the GitHub release from the VSIX built by the matching CI workflow, then publishes
+# that same VSIX to the Marketplace. Afterwards the minor version is bumped on develop
+# so the next run publishes a new version.
 # It never runs for pull request builds.
 on:
   workflow_run:
@@ -58,24 +58,6 @@ jobs:
         run-id: ${{ env.RUN_ID }}
         github-token: ${{ github.token }}
 
-    - name: Publish to Marketplace
-      env:
-        AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
-      run: |
-        if ([string]::IsNullOrEmpty($env:AZURE_DEVOPS_PAT)) {
-          echo "::error::AZURE_DEVOPS_PAT secret is not configured. Please add it to repository secrets."
-          echo "::error::Visit: https://github.com/${{ github.repository }}/settings/secrets/actions"
-          exit 1
-        }
-        echo "::notice::Publishing SqlPackage Publisher extension to Azure DevOps Marketplace..."
-        npx tfx-cli extension publish --vsix (Get-ChildItem -Filter *.vsix | Select-Object -First 1).Name --token $env:AZURE_DEVOPS_PAT --no-prompt
-        if ($LASTEXITCODE -ne 0) {
-          echo "::error::Failed to publish SqlPackage Publisher extension to marketplace"
-          exit 1
-        }
-        echo "::notice::Successfully published SqlPackage Publisher to marketplace"
-      shell: pwsh
-
     - name: Read version
       id: get_version
       shell: pwsh
@@ -101,28 +83,86 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Bumps the minor version on develop so the next run does not republish this one.
-  # Commits made with GITHUB_TOKEN do not trigger other workflows, so this cannot loop.
-  bump-version:
+    - name: Publish to Marketplace
+      env:
+        AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+      run: |
+        if ([string]::IsNullOrEmpty($env:AZURE_DEVOPS_PAT)) {
+          echo "::error::AZURE_DEVOPS_PAT secret is not configured. Please add it to repository secrets."
+          echo "::error::Visit: https://github.com/${{ github.repository }}/settings/secrets/actions"
+          exit 1
+        }
+        echo "::notice::Publishing SqlPackage Publisher extension to Azure DevOps Marketplace..."
+        npx tfx-cli extension publish --vsix (Get-ChildItem -Filter *.vsix | Select-Object -First 1).Name --token $env:AZURE_DEVOPS_PAT --no-prompt --no-wait-validation
+        if ($LASTEXITCODE -ne 0) {
+          echo "::error::Failed to publish SqlPackage Publisher extension to marketplace"
+          exit 1
+        }
+        echo "::notice::Uploaded SqlPackage Publisher to marketplace; validation continues in the validate job"
+      shell: pwsh
+
+  # The Marketplace validates uploads asynchronously and can take a long time, so publishing does not wait for it.
+  # A rejected extension fails this job; a validation that is still pending after the timeout only warns.
+  validate:
     runs-on: ubuntu-latest
     needs: publish
+    env:
+      RUN_ID: ${{ github.event.workflow_run.id || inputs.run_id }}
     steps:
-    - name: Checkout develop
-      uses: actions/checkout@v4
+    - name: Download CI artifact
+      uses: actions/download-artifact@v8
       with:
-        ref: develop
+        name: publisher-vsix-package
+        run-id: ${{ env.RUN_ID }}
+        github-token: ${{ github.token }}
 
-    - name: Bump minor version
-      run: node .github/scripts/bump-version.js src/Services/Task.SqlPackage.Publisher "${{ needs.publish.outputs.version }}"
-
-    - name: Commit and push
+    - name: Wait for Marketplace validation
+      shell: pwsh
+      timeout-minutes: 45
+      env:
+        AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
       run: |
-        if git diff --quiet; then
-          echo "No version change to commit"
-          exit 0
-        fi
-        git config user.name "github-actions[bot]"
-        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-        git commit -am "chore: bump publisher version after release v${{ needs.publish.outputs.version }} [skip ci]"
-        git pull --rebase origin develop
-        git push origin HEAD:develop
+        $vsix = (Get-ChildItem -Filter *.vsix | Select-Object -First 1).Name
+        $deadline = (Get-Date).AddMinutes(30)
+        while ((Get-Date) -lt $deadline) {
+          $output = (npx tfx-cli extension isvalid --vsix $vsix --token $env:AZURE_DEVOPS_PAT --no-prompt --json 2>$null) -join "`n"
+          $status = if ($output -match '"status"\s*:\s*"(\w+)"') { $Matches[1] } else { 'unknown' }
+          echo "Validation status: $status"
+          if ($status -eq 'success') {
+            echo "::notice::SqlPackage Publisher passed Marketplace validation"
+            exit 0
+          }
+          if ($status -eq 'error') {
+            echo "::error::SqlPackage Publisher was rejected by Marketplace validation: $output"
+            exit 1
+          }
+          Start-Sleep -Seconds 30
+        }
+        echo "::warning::Marketplace validation of SqlPackage Publisher is still pending after 30 minutes. It will become available once validation completes."
+
+  # Bumps the minor version on develop so the next run does not republish this one.
+  # Commits made with GITHUB_TOKEN do not trigger other workflows, so this cannot loop.
+# Automatic version bump disabled temporarily (develop ruleset requires PRs); bump versions manually.
+#   bump-version:
+#     runs-on: ubuntu-latest
+#     needs: publish
+#     steps:
+#     - name: Checkout develop
+#       uses: actions/checkout@v4
+#       with:
+#         ref: develop
+#
+#     - name: Bump minor version
+#       run: node .github/scripts/bump-version.js src/Services/Task.SqlPackage.Publisher "${{ needs.publish.outputs.version }}"
+#
+#     - name: Commit and push
+#       run: |
+#         if git diff --quiet; then
+#           echo "No version change to commit"
+#           exit 0
+#         fi
+#         git config user.name "github-actions[bot]"
+#         git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+#         git commit -am "chore: bump publisher version after release v${{ needs.publish.outputs.version }} [skip ci]"
+#         git pull --rebase origin develop
+#         git push origin HEAD:develop
