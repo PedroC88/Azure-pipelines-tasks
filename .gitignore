@@ -200,3 +200,4 @@ Thumbs.db
 .vscode/settings.json
 .vscode/launch.json
 .idea/
+src/Services/**/release-version.txt

@@ -15,8 +15,8 @@ The workflows use path filtering, so they only trigger when relevant files chang
 ## Required Status Checks
 
 The workflows define the following status checks that should be required:
-- `Build and Publish SqlPackage Installer / build` - for Installer changes
-- `Build and Publish SqlPackage Publisher / build` - for Publisher changes
+- `CI - SqlPackage Installer / build` - for Installer changes
+- `CI - SqlPackage Publisher / build` - for Publisher changes
 
 **Important:** Due to path filtering, only the relevant status checks will be required for each PR:
 - A PR that modifies only Installer files will only require the Installer build check
@@ -42,8 +42,8 @@ The workflows define the following status checks that should be required:
 1. Check **Require status checks to pass before merging**
 2. Check **Require branches to be up to date before merging** (recommended)
 3. In the search box under "Status checks that are required", search for and add:
-   - `Build and Publish SqlPackage Installer / build`
-   - `Build and Publish SqlPackage Publisher / build`
+   - `CI - SqlPackage Installer / build`
+   - `CI - SqlPackage Publisher / build`
 
 ### 4. Additional Recommended Settings
 
@@ -65,10 +65,10 @@ PR: Feature branch → develop
 Files changed: src/Services/Task.SqlPackage.Installer/index.ts
 
 Status checks required:
-✅ Build and Publish SqlPackage Installer / build
+✅ CI - SqlPackage Installer / build
 
 Status checks NOT required (no changes to Publisher):
-⚪ Build and Publish SqlPackage Publisher / build
+⚪ CI - SqlPackage Publisher / build
 ```
 
 ### Scenario 2: PR with Publisher Changes
@@ -78,10 +78,10 @@ PR: Feature branch → develop
 Files changed: src/Services/Task.SqlPackage.Publisher/index.ts
 
 Status checks required:
-✅ Build and Publish SqlPackage Publisher / build
+✅ CI - SqlPackage Publisher / build
 
 Status checks NOT required (no changes to Installer):
-⚪ Build and Publish SqlPackage Installer / build
+⚪ CI - SqlPackage Installer / build
 ```
 
 ### Scenario 3: PR with Both Extensions Changed
@@ -93,8 +93,8 @@ Files changed:
   - src/Services/Task.SqlPackage.Publisher/index.ts
 
 Status checks required:
-✅ Build and Publish SqlPackage Installer / build
-✅ Build and Publish SqlPackage Publisher / build
+✅ CI - SqlPackage Installer / build
+✅ CI - SqlPackage Publisher / build
 ```
 
 ### Scenario 4: PR with No Extension Changes
@@ -104,8 +104,8 @@ PR: Feature branch → develop
 Files changed: README.md
 
 Status checks NOT required:
-⚪ Build and Publish SqlPackage Installer / build
-⚪ Build and Publish SqlPackage Publisher / build
+⚪ CI - SqlPackage Installer / build
+⚪ CI - SqlPackage Publisher / build
 
 Result: PR can be merged without waiting for builds
 ```
@@ -124,8 +124,8 @@ If the status checks don't appear in the search box:
 The status check name format is: `<workflow name> / <job name>`
 
 Current workflow names:
-- `Build and Publish SqlPackage Installer`
-- `Build and Publish SqlPackage Publisher`
+- `CI - SqlPackage Installer`
+- `CI - SqlPackage Publisher`
 
 Job name: `build`
 
@@ -141,33 +141,33 @@ This indicates the path filtering is not working correctly. Verify:
 ## Workflow Files Reference
 
 ### Installer Workflow
-`.github/workflows/publish-installer.yml`
+`.github/workflows/ci-installer.yml`
 ```yaml
 on:
   push:
     branches: [develop]
     paths:
       - 'src/Services/Task.SqlPackage.Installer/**'
-      - '.github/workflows/publish-installer.yml'
+      - '.github/workflows/ci-installer.yml'
   pull_request:
     paths:
       - 'src/Services/Task.SqlPackage.Installer/**'
-      - '.github/workflows/publish-installer.yml'
+      - '.github/workflows/ci-installer.yml'
 ```
 
 ### Publisher Workflow
-`.github/workflows/publish-publisher.yml`
+`.github/workflows/ci-publisher.yml`
 ```yaml
 on:
   push:
     branches: [develop]
     paths:
       - 'src/Services/Task.SqlPackage.Publisher/**'
-      - '.github/workflows/publish-publisher.yml'
+      - '.github/workflows/ci-publisher.yml'
   pull_request:
     paths:
       - 'src/Services/Task.SqlPackage.Publisher/**'
-      - '.github/workflows/publish-publisher.yml'
+      - '.github/workflows/ci-publisher.yml'
 ```
 
 ## Testing
