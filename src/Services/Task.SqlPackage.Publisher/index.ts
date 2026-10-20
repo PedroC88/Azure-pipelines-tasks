@@ -544,14 +544,16 @@ async function addSqlCmdAuthentication(
 export async function run() {
     try {
         // Get inputs
+        // Agents resolve an empty filePath input (even a hidden one) to the sources directory,
+        // so dacpacFile cannot be used to detect DACPAC mode: an explicit script selection wins.
+        const requestedTaskType = tl.getInput('taskNameSelector', false);
+        const taskNameSelector = requestedTaskType === 'SqlTask' || requestedTaskType === 'InlineSqlTask'
+            ? requestedTaskType
+            : 'DacpacTask';
         const dacpacFile = tl.getPathInput('dacpacFile', false, true);
         const targetMethod = tl.getInput('targetMethod', true) || 'server';
         const publishProfile = tl.getPathInput('publishProfile', false);
         const additionalArguments = tl.getInput('additionalArguments', false) || '';
-        const requestedTaskType = dacpacFile ? 'DacpacTask' : tl.getInput('taskNameSelector', false);
-        const taskNameSelector = requestedTaskType === 'SqlTask' || requestedTaskType === 'InlineSqlTask'
-            ? requestedTaskType
-            : 'DacpacTask';
 
         if (taskNameSelector === 'SqlTask' || taskNameSelector === 'InlineSqlTask') {
             const serverName = targetMethod === 'server' ? tl.getInput('serverName', false) || '' : '';

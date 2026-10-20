@@ -20,6 +20,11 @@
 - Detailed error messages
 - Integration with SqlPackage Installer task
 
+## v1.4.0
+
+### Fixed
+- Script modes (`SqlTask` and `InlineSqlTask`) no longer fall back to DACPAC deployment or require SqlPackage. Agents resolve the empty hidden `dacpacFile` input to the sources directory, which made 1.3.0 always run in DACPAC mode.
+
 ## v1.3.0
 
 ### Added
