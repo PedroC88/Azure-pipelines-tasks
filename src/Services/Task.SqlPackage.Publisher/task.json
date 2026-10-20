@@ -10,7 +10,7 @@
   "icon": "icon.png",
   "version": {
     "Major": 1,
-    "Minor": 4,
+    "Minor": 5,
     "Patch": 0
   },
   "instanceNameFormat": "Deploy $(dacpacFile) to $(databaseName)",

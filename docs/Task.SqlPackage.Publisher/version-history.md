@@ -20,6 +20,15 @@
 - Detailed error messages
 - Integration with SqlPackage Installer task
 
+## v1.5.0
+
+### Fixed
+- Script modes with Entra Integrated authentication failed with "Must provide 'password' parameter when using ActiveDirectoryServicePrincipalAccessToken authentication", because sqlcmd cannot consume a pre-acquired access token. sqlcmd now authenticates itself:
+  - Service principal connections with a secret use `ActiveDirectoryServicePrincipal`
+  - Workload identity federation connections use `ActiveDirectoryAzurePipelines`
+  - Managed identity connections are unchanged
+- Service connections that only provide a raw access token are rejected for script modes with a clear error (DACPAC mode is unchanged)
+
 ## v1.4.0
 
 ### Fixed

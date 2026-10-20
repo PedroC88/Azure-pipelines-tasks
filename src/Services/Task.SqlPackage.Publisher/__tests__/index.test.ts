@@ -1337,41 +1337,77 @@ describe('SqlPackage Publisher Tests', () => {
             );
         });
 
-        it('uses the go-sqlcmd authentication method with Entra service connections', async () => {
-            mockGetInput.mockReset().mockImplementation((name: string) => ({
-                taskNameSelector: 'InlineSqlTask',
-                targetMethod: 'server',
-                serverName: 'myserver.database.windows.net',
-                databaseName: 'mydb',
-                authenticationType: 'entraIntegrated',
-                azureSubscription: 'service-connection',
-                sqlInline: 'SELECT 1;'
-            }[name] || ''));
+        const entraScriptInputs = (name: string) => ({
+            taskNameSelector: 'InlineSqlTask',
+            targetMethod: 'server',
+            serverName: 'myserver.database.windows.net',
+            databaseName: 'mydb',
+            authenticationType: 'entraIntegrated',
+            azureSubscription: 'service-connection',
+            sqlInline: 'SELECT 1;'
+        } as Record<string, string>)[name] || '';
+
+        const mockEndpoint = (scheme: string, parameters: Record<string, string>) => {
+            mockGetInput.mockReset().mockImplementation(entraScriptInputs);
             mockGetPathInput.mockReturnValue('');
-            mockGetEndpointAuthorization.mockReturnValue({
-                scheme: 'ServicePrincipal',
-                parameters: {
-                    AccessToken: 'sql-access-token',
-                    serviceprincipalid: 'client-id',
-                    serviceprincipalkey: 'client-secret'
-                }
-            });
-            mockGetEndpointAuthorizationScheme.mockReturnValue('ServicePrincipal');
+            mockGetEndpointAuthorization.mockReturnValue({ scheme, parameters });
+            mockGetEndpointAuthorizationScheme.mockReturnValue(scheme);
             mockGetEndpointAuthorizationParameter.mockImplementation((_id: string, name: string) =>
-                name === 'serviceprincipalid' ? 'client-id' : undefined);
+                _id === 'SystemVssConnection' && name === 'AccessToken' ? 'system-token' : parameters[name]);
             (fs.mkdtempSync as jest.Mock).mockReturnValue('/tmp/sqlpackage-publisher-test');
+        };
+
+        it('uses ActiveDirectoryServicePrincipal with the secret of a service principal connection', async () => {
+            mockEndpoint('ServicePrincipal', {
+                serviceprincipalid: 'client-id',
+                tenantid: 'tenant-id',
+                serviceprincipalkey: 'client-secret'
+            });
 
             await run();
 
             expect(mockExec).toHaveBeenCalledWith('sqlcmd', expect.arrayContaining([
                 '--authentication-method',
-                'ActiveDirectoryServicePrincipalAccessToken',
+                'ActiveDirectoryServicePrincipal',
                 '-U',
-                'client-id'
+                'client-id@tenant-id'
             ]), expect.objectContaining({
-                env: expect.objectContaining({ SQLCMDPASSWORD: 'sql-access-token' })
+                env: expect.objectContaining({ SQLCMDPASSWORD: 'client-secret' })
             }));
-            expect(mockSetSecret).toHaveBeenCalledWith('sql-access-token');
+            expect(mockSetSecret).toHaveBeenCalledWith('client-secret');
+        });
+
+        it('uses ActiveDirectoryAzurePipelines for workload identity federation connections', async () => {
+            mockEndpoint('WorkloadIdentityFederation', {
+                serviceprincipalid: 'client-id',
+                tenantid: 'tenant-id'
+            });
+
+            await run();
+
+            expect(mockExec).toHaveBeenCalledWith('sqlcmd', expect.arrayContaining([
+                '--authentication-method',
+                'ActiveDirectoryAzurePipelines'
+            ]), expect.objectContaining({
+                env: expect.objectContaining({
+                    AZURESUBSCRIPTION_CLIENT_ID: 'client-id',
+                    AZURESUBSCRIPTION_TENANT_ID: 'tenant-id',
+                    AZURESUBSCRIPTION_SERVICE_CONNECTION_ID: 'service-connection',
+                    SYSTEM_ACCESSTOKEN: 'system-token'
+                })
+            }));
+            expect(mockExec).not.toHaveBeenCalledWith('sqlcmd', expect.arrayContaining([
+                'ActiveDirectoryServicePrincipalAccessToken'
+            ]), expect.anything());
+            expect(mockSetSecret).toHaveBeenCalledWith('system-token');
+        });
+
+        it('fails clearly when the service connection only provides an access token', async () => {
+            mockEndpoint('Token', { AccessToken: 'sql-access-token' });
+
+            await run();
+
+            expect(mockSetResult).toHaveBeenCalledWith(2, expect.stringContaining('cannot authenticate with a pre-acquired access token'));
         });
     });
 

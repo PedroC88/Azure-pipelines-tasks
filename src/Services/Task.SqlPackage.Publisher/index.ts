@@ -528,14 +528,51 @@ async function addSqlCmdAuthentication(
             return;
         }
 
+        // go-sqlcmd cannot consume a pre-acquired access token, so the service connection credentials
+        // are handed to sqlcmd itself through the authentication methods it supports.
+        const endpointAuth = tl.getEndpointAuthorization(azureSubscription, true);
+        const readParameter = (name: string): string | undefined =>
+            tl.getEndpointAuthorizationParameter(azureSubscription, name, true) ||
+            tl.getEndpointDataParameter(azureSubscription, name, true) ||
+            endpointAuth?.parameters?.[name];
+
         const servicePrincipalId = getServicePrincipalId(azureSubscription);
+        const tenantId = readParameter('tenantid');
+        const servicePrincipalKey = readParameter('serviceprincipalkey');
+
+        if (readParameter('AccessToken') && !servicePrincipalId) {
+            throw new Error('sqlcmd cannot authenticate with a pre-acquired access token. Use a service connection based on a service principal, workload identity federation or managed identity.');
+        }
         if (!servicePrincipalId) {
             throw new Error('The service connection must provide a service principal ID to authenticate sqlcmd with Entra ID.');
         }
+        const clientIdentity = tenantId ? `${servicePrincipalId}@${tenantId}` : servicePrincipalId;
 
-        const accessToken = await getEntraAccessToken(azureSubscription, serverName);
-        args.push('--authentication-method', 'ActiveDirectoryServicePrincipalAccessToken', '-U', servicePrincipalId);
-        environment.SQLCMDPASSWORD = accessToken;
+        if (servicePrincipalKey) {
+            args.push('--authentication-method', 'ActiveDirectoryServicePrincipal', '-U', clientIdentity);
+            tl.setSecret(servicePrincipalKey);
+            environment.SQLCMDPASSWORD = servicePrincipalKey;
+        } else if (authScheme === 'WorkloadIdentityFederation') {
+            const systemAccessToken = tl.getEndpointAuthorizationParameter('SystemVssConnection', 'AccessToken', false) ||
+                process.env['SYSTEM_ACCESSTOKEN'];
+            if (!systemAccessToken) {
+                throw new Error('Unable to read the pipeline access token required for workload identity federation.');
+            }
+            tl.setSecret(systemAccessToken);
+            args.push('--authentication-method', 'ActiveDirectoryAzurePipelines');
+            environment.AZURESUBSCRIPTION_CLIENT_ID = servicePrincipalId;
+            if (tenantId) {
+                environment.AZURESUBSCRIPTION_TENANT_ID = tenantId;
+            }
+            environment.AZURESUBSCRIPTION_SERVICE_CONNECTION_ID = azureSubscription;
+            environment.SYSTEM_ACCESSTOKEN = systemAccessToken;
+            const oidcRequestUri = tl.getVariable('System.OidcRequestUri');
+            if (oidcRequestUri) {
+                environment.SYSTEM_OIDCREQUESTURI = oidcRequestUri;
+            }
+        } else {
+            throw new Error(`Unable to authenticate sqlcmd with service connection "${azureSubscription}". Use a service principal with a secret, workload identity federation or managed identity.`);
+        }
     } else {
         throw new Error(`Unsupported authentication type: ${authenticationType}`);
     }
