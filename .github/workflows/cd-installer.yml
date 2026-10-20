@@ -45,7 +45,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
 
     - name: Download CI artifact
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         name: installer-vsix-package
         run-id: ${{ env.RUN_ID }}
@@ -77,7 +77,7 @@ jobs:
         echo "version=$version" >> $env:GITHUB_OUTPUT
 
     - name: Create GitHub Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v3
       with:
         tag_name: installer-v${{ steps.get_version.outputs.version }}
         name: SqlPackage Installer v${{ steps.get_version.outputs.version }}
