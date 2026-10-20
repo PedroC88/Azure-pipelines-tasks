@@ -17,11 +17,15 @@ jest.mock('os', () => ({
 }));
 
 import * as os from 'os';
+import * as path from 'path';
 import * as fs from 'fs';
 import * as tl from 'azure-pipelines-task-lib/task';
 
 const { run } = require('../index');
+
 const tr = require('azure-pipelines-tool-lib/tool');
+
+const toPosix = (filePath: string) => filePath.replace(/\\/g, '/');
 
 describe('SqlCmd Installer', () => {
   const releases = [{
@@ -46,7 +50,7 @@ describe('SqlCmd Installer', () => {
     (tl.getBoolInput as jest.Mock).mockReturnValue(false);
     (fs.readFileSync as jest.Mock).mockReturnValue(JSON.stringify(releases));
     (fs.existsSync as jest.Mock).mockImplementation((filePath: string) =>
-      filePath.endsWith('/sqlcmd') || filePath.endsWith('sqlcmd.exe'));
+      /\/sqlcmd(\.exe)?$/.test(toPosix(filePath)));
     (fs.readdirSync as jest.Mock).mockReturnValue([]);
     (tr.findLocalTool as jest.Mock).mockReturnValue('');
     (tr.cacheDir as jest.Mock).mockResolvedValue('/agent/_work/_tool/SqlCmd/1.10.0/x64');
@@ -70,7 +74,7 @@ describe('SqlCmd Installer', () => {
     expect(tr.downloadTool).toHaveBeenNthCalledWith(2, assetUrl);
     expect(tr[extractMethod]).toHaveBeenCalledWith('/tmp/sqlcmd-package');
     expect(tr.cacheDir).toHaveBeenCalledWith(
-      '/tmp/sqlcmd-unpacked',
+      path.normalize('/tmp/sqlcmd-unpacked'),
       'SqlCmd',
       '1.10.0',
       'x64',
@@ -103,13 +107,13 @@ describe('SqlCmd Installer', () => {
       .mockResolvedValueOnce('/tmp/sqlcmd-package');
     (tr.extractTar as jest.Mock).mockResolvedValue('/tmp/sqlcmd-unpacked');
     (fs.existsSync as jest.Mock).mockImplementation((filePath: string) =>
-      !filePath.startsWith('/custom/sqlcmd/') && filePath.endsWith('/sqlcmd'));
+      !toPosix(filePath).startsWith('/custom/sqlcmd/') && toPosix(filePath).endsWith('/sqlcmd'));
 
     await run();
 
     expect(fs.copyFileSync).toHaveBeenCalledWith(
-      '/agent/_work/_tool/SqlCmd/1.10.0/x64/sqlcmd',
-      '/custom/sqlcmd/sqlcmd',
+      path.join('/agent/_work/_tool/SqlCmd/1.10.0/x64', 'sqlcmd'),
+      path.join('/custom/sqlcmd', 'sqlcmd'),
     );
     expect(tr.prependPath).toHaveBeenCalledWith('/custom/sqlcmd');
     expect(tl.setVariable).toHaveBeenCalledWith('SqlCmdRoot', '/custom/sqlcmd');
