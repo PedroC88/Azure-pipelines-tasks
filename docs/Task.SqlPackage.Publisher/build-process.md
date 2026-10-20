@@ -152,7 +152,7 @@ The pipeline is split into two workflows:
 2. Downloads the VSIX artifact from that CI run (it does not rebuild)
 3. Creates the GitHub release for the extension version
 4. Publishes the same VSIX to the Azure DevOps Marketplace without waiting for validation
-5. Checks the Marketplace validation result in a separate job, then bumps the minor version on develop
+5. Checks the Marketplace validation result in a separate job (the automatic version bump job is temporarily commented out; bump versions manually in a PR)
 
 ### Manual CD Trigger
 
