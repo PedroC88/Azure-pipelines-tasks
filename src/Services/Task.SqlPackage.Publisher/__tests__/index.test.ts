@@ -64,6 +64,8 @@ describe('SqlPackage Publisher Tests', () => {
         mockExistsSync.mockReset().mockReturnValue(true);
         mockGetPathInput.mockReset().mockReturnValue('');
         mockGetInput.mockReset().mockReturnValue('');
+        // run() reads taskNameSelector first; keeps ordered mockReturnValueOnce chains aligned
+        mockGetInput.mockReturnValueOnce('DacpacTask');
         mockGetEndpointAuthorization.mockReset().mockReturnValue(undefined);
         mockGetEndpointAuthorizationScheme.mockReset().mockReturnValue(undefined);
         mockGetEndpointAuthorizationParameter.mockReset().mockReturnValue(undefined);
@@ -1245,7 +1247,7 @@ describe('SqlPackage Publisher Tests', () => {
         });
 
         it('runs a SQL file using sqlcmd arguments and credentials', async () => {
-            mockGetInput.mockImplementation((name: string) => ({
+            mockGetInput.mockReset().mockImplementation((name: string) => ({
                 taskNameSelector: 'SqlTask',
                 targetMethod: 'server',
                 serverName: 'myserver',
@@ -1280,8 +1282,28 @@ describe('SqlPackage Publisher Tests', () => {
             );
         });
 
+        it('does not require SqlPackage when a script mode is selected and dacpacFile resolves to a directory', async () => {
+            mockGetInput.mockReset().mockImplementation((name: string) => ({
+                taskNameSelector: 'SqlTask',
+                targetMethod: 'server',
+                serverName: 'myserver',
+                databaseName: 'mydb',
+                authenticationType: 'windowsAuthentication'
+            }[name] || ''));
+            mockGetPathInput.mockImplementation((name: string) =>
+                name === 'sqlFile' ? '/scripts/deploy.sql' : '/agent/_work/1/s');
+            (tl.findMatch as jest.Mock).mockReturnValue(['/scripts/deploy.sql']);
+            (fs.statSync as jest.Mock).mockReturnValue({ isFile: () => true });
+
+            await run();
+
+            expect(mockExec).not.toHaveBeenCalledWith('sqlpackage', expect.anything());
+            expect(mockExec).toHaveBeenCalledWith('sqlcmd', ['--version']);
+            expect(tl.setResult).toHaveBeenCalledWith(tl.TaskResult.Succeeded, expect.any(String));
+        });
+
         it('runs inline SQL from a temporary file and parses a SQL connection string', async () => {
-            mockGetInput.mockImplementation((name: string) => ({
+            mockGetInput.mockReset().mockImplementation((name: string) => ({
                 taskNameSelector: 'InlineSqlTask',
                 targetMethod: 'connectionString',
                 connectionString: 'Server=myserver;Database=mydb;User Id=sqluser;Password={p;ass};TrustServerCertificate=True',
@@ -1316,7 +1338,7 @@ describe('SqlPackage Publisher Tests', () => {
         });
 
         it('uses the go-sqlcmd authentication method with Entra service connections', async () => {
-            mockGetInput.mockImplementation((name: string) => ({
+            mockGetInput.mockReset().mockImplementation((name: string) => ({
                 taskNameSelector: 'InlineSqlTask',
                 targetMethod: 'server',
                 serverName: 'myserver.database.windows.net',
