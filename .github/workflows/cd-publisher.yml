@@ -68,12 +68,12 @@ jobs:
           exit 1
         }
         echo "::notice::Publishing SqlPackage Publisher extension to Azure DevOps Marketplace..."
-        npx tfx-cli extension publish --vsix (Get-ChildItem -Filter *.vsix | Select-Object -First 1).Name --token $env:AZURE_DEVOPS_PAT --no-prompt
+        npx tfx-cli extension publish --vsix (Get-ChildItem -Filter *.vsix | Select-Object -First 1).Name --token $env:AZURE_DEVOPS_PAT --no-prompt --no-wait-validation
         if ($LASTEXITCODE -ne 0) {
           echo "::error::Failed to publish SqlPackage Publisher extension to marketplace"
           exit 1
         }
-        echo "::notice::Successfully published SqlPackage Publisher to marketplace"
+        echo "::notice::Uploaded SqlPackage Publisher to marketplace; validation continues in the validate job"
       shell: pwsh
 
     - name: Read version
@@ -100,6 +100,45 @@ jobs:
         prerelease: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # The Marketplace validates uploads asynchronously and can take a long time, so publishing does not wait for it.
+  # A rejected extension fails this job; a validation that is still pending after the timeout only warns.
+  validate:
+    runs-on: ubuntu-latest
+    needs: publish
+    env:
+      RUN_ID: ${{ github.event.workflow_run.id || inputs.run_id }}
+    steps:
+    - name: Download CI artifact
+      uses: actions/download-artifact@v8
+      with:
+        name: publisher-vsix-package
+        run-id: ${{ env.RUN_ID }}
+        github-token: ${{ github.token }}
+
+    - name: Wait for Marketplace validation
+      shell: pwsh
+      timeout-minutes: 45
+      env:
+        AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+      run: |
+        $vsix = (Get-ChildItem -Filter *.vsix | Select-Object -First 1).Name
+        $deadline = (Get-Date).AddMinutes(30)
+        while ((Get-Date) -lt $deadline) {
+          $output = (npx tfx-cli extension isvalid --vsix $vsix --token $env:AZURE_DEVOPS_PAT --no-prompt --json 2>$null) -join "`n"
+          $status = if ($output -match '"status"\s*:\s*"(\w+)"') { $Matches[1] } else { 'unknown' }
+          echo "Validation status: $status"
+          if ($status -eq 'success') {
+            echo "::notice::SqlPackage Publisher passed Marketplace validation"
+            exit 0
+          }
+          if ($status -eq 'error') {
+            echo "::error::SqlPackage Publisher was rejected by Marketplace validation: $output"
+            exit 1
+          }
+          Start-Sleep -Seconds 30
+        }
+        echo "::warning::Marketplace validation of SqlPackage Publisher is still pending after 30 minutes. It will become available once validation completes."
 
   # Bumps the minor version on develop so the next run does not republish this one.
   # Commits made with GITHUB_TOKEN do not trigger other workflows, so this cannot loop.
