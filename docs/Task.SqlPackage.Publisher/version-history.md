@@ -284,7 +284,7 @@ Contributions welcome! See repository for guidelines.
 - Pull requests for improvements
 
 ### License
-UNLICENSED - Custom non-commercial license
+MIT
 
 ---
 

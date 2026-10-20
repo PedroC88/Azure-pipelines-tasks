@@ -1,7 +1,7 @@
 # SqlPackage Installer
 
 [![Build Status](https://github.com/PedroC88/Azure-pipelines-tasks/workflows/Build%20and%20Publish/badge.svg)](https://github.com/PedroC88/Azure-pipelines-tasks/actions)
-[![License](https://img.shields.io/badge/license-Custom-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Azure DevOps task that installs SqlPackage and adds it to your pipeline PATH. SqlPackage is a command-line utility that automates database development tasks for SQL Server, Azure SQL Database, and Azure SQL Data Warehouse.
 
@@ -243,7 +243,7 @@ Contributions are welcome! Please feel free to submit issues or pull requests.
 
 ## License
 
-This project is licensed under a custom non-commercial license. See [LICENSE](LICENSE) for details.
+This project is licensed under the [MIT License](LICENSE) for details.
 
 ## Links
 

@@ -4,7 +4,7 @@ Deploy SQL Server DACPAC files using SqlPackage or run SQL scripts with sqlcmd. 
 
 ## 📄 License
 
-Custom non-commercial license - free for personal use. See [LICENSE](https://github.com/PedroC88/Azure-pipelines-tasks/blob/develop/LICENSE) for details.
+MIT License. See [LICENSE](https://github.com/PedroC88/Azure-pipelines-tasks/blob/develop/LICENSE) for details.
 
 ## 🚀 Quick Start
 

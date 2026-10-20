@@ -106,4 +106,4 @@ npm run package
 
 ## License
 
-UNLICENSED - Custom non-commercial license
+MIT
