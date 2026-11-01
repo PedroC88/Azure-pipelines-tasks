@@ -18,12 +18,12 @@
   "author": "PedroC88",
   "license": "MIT",
   "dependencies": {
-    "azure-pipelines-task-lib": "^5.281.2"
+    "azure-pipelines-task-lib": "^5.282.0"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "@types/node": "^20.0.0",
-    "@typescript-eslint/eslint-plugin": "^8.71.2",
+    "@typescript-eslint/eslint-plugin": "^8.72.1",
     "@typescript-eslint/parser": "^8.19.1",
     "eslint": "^9.17.0",
     "jest": "^30.5.2",
